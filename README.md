@@ -71,7 +71,7 @@ curl -X PUT localhost:5173/api/sessions/<id>/layers/mesure-1 -H 'content-type: a
 }'
 ```
 
-Ports : trous (`e25`, `+H7`, `-B30`), broches de la carte par nom (`IO9`, `GND`, `3V3`), fils du jack (`EAR_P`, `mic 1`…).
+Ports : trous (`e25`, rails par colonne `+H44`, `-B30`), broches de la carte par nom (`IO9`, `GND`, `3V3`), fils du jack (`EAR_P`, `mic 1`…).
 Couleurs : `rouge`, `noir`, `orange`, `bleu`, `vert`, `jaune`, `violet`, `blanc`, `rose`, `gris` ou hexadécimal.
 
 ## Déploiement

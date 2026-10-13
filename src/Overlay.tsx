@@ -1,7 +1,7 @@
 // Rendu des calques visibles, par-dessus tout le reste du canevas (ne capte pas la souris).
 // Les repères gardent une taille lisible quel que soit le zoom.
 
-import type { Pt } from './geom'
+import { railShift, type Pt } from './geom'
 import { annColor, portName, resolvePart, resolvePort, type Layer } from './layers'
 import type { Session } from './model'
 
@@ -31,8 +31,7 @@ function Band({ port, color, at, k }: { port: string; color: string; at: (p: str
   let ends: [string, string]
   let row: [string, string] | null = null
   if (rail) {
-    const n = Number(rail[2])
-    ends = [`${rail[1]}${Math.max(1, n - 2)}`, `${rail[1]}${Math.min(50, n + 2)}`]
+    ends = [railShift(port, -2), railShift(port, 2)]
   } else {
     const m = /^([a-j])(\d+)$/.exec(port)
     if (!m) return null

@@ -2,7 +2,7 @@
 // Rien ici n'est propre à un montage précis : l'analyse ne connaît que les règles générales.
 
 import {
-  BB_H, BB_HOLE, BB_W, CARD_H, CARD_PIN, CARD_PINS, CARD_W, JACK_H, JACK_LEAD, JACK_LEADS, JACK_W, Nets, holeLabel, isHole,
+  BB_H, BB_HOLE, BB_W, RAIL_COLS, CARD_H, CARD_PIN, CARD_PINS, CARD_W, JACK_H, JACK_LEAD, JACK_LEADS, JACK_W, Nets, holeLabel, isHole,
   stripLabel, stripOf, type Pos,
 } from './geom'
 
@@ -37,6 +37,8 @@ export interface Session {
   /** Blocs présents dans la boîte (posés ou non). */
   blocks: BlockId[]
   parts: Part[]
+  /** « col » : trous de rail numérotés par colonne (60 → 3). Absent = ancien format (1 → 50), converti au chargement. */
+  railNumbering?: 'col'
 }
 
 export const BLOCKS: Record<NodeId, { title: string; desc: string; w: number; h: number }> = {
@@ -58,7 +60,7 @@ let seq = 0
 export const newId = () => `${Date.now().toString(36)}${(seq++).toString(36)}`
 
 export function newSession(name: string): Session {
-  return { id: uuid(), name, createdAt: new Date().toISOString(), nodes: { bb: { x: 0, y: 0, rot: 0 } }, blocks: [], parts: [] }
+  return { id: uuid(), name, createdAt: new Date().toISOString(), nodes: { bb: { x: 0, y: 0, rot: 0 } }, blocks: [], parts: [], railNumbering: 'col' }
 }
 
 /** Remet d'aplomb une session venue du serveur (anciens formats compris). */
@@ -67,10 +69,18 @@ export function normalize(s: Session): Session {
   for (const k of Object.keys(nodes) as NodeId[]) if (nodes[k]) nodes[k] = { ...nodes[k]!, rot: nodes[k]!.rot ?? 0 }
   const blocks = s.blocks ?? (['card', 'jack'] as BlockId[]).filter((b) => nodes[b] || s.parts.some((p) => b === 'jack' && p.kind === 'L'))
   let parts = s.parts ?? []
+  // Ancienne numérotation des rails (1 → 50) : on passe au numéro de colonne (60 → 3).
+  if (s.railNumbering !== 'col') {
+    const conv = (p: string | null) => {
+      const m = p ? /^([+-][HB])(\d+)$/.exec(p) : null
+      return m && Number(m[2]) >= 1 && Number(m[2]) <= RAIL_COLS.length ? `${m[1]}${RAIL_COLS[Number(m[2]) - 1]}` : p
+    }
+    parts = parts.map((p) => ({ ...p, a: conv(p.a), b: conv(p.b) }))
+  }
   // Ancien câble (5 fils) : on remet les fils du câble actuel, débranchés.
   if (blocks.includes('jack') && JACK_LEADS.some((l) => !parts.some((p) => p.id === l.id)))
     parts = [...parts.filter((p) => p.kind !== 'L'), ...JACK_LEADS.map((l): Part => ({ id: l.id, kind: 'L', label: l.label, color: l.color, a: l.id, b: null }))]
-  return { ...s, nodes, blocks, parts }
+  return { ...s, nodes, blocks, parts, railNumbering: 'col' }
 }
 
 // ------------------------------------------------------------------ couleurs et code des résistances

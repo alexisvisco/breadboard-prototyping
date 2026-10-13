@@ -32,6 +32,21 @@ export const bbRailX = (k: number) => {
 }
 export const bbRowY = (r: string) => ROW_Y[r]
 
+/** Numéro d'un trou de rail = la colonne au-dessus de laquelle il se trouve (60 → 3, comme imprimé). */
+export const RAIL_COLS: number[] = Array.from({ length: RAIL_HOLES }, (_, j) =>
+  Math.round(60 - (Math.floor(j / 5) * (4 + GROUP_GAP) + (j % 5))),
+)
+/** Rang (0 à 49, de gauche à droite) d'un trou de rail « +H44 », ou -1. */
+export function railIndex(id: string): number {
+  const m = /^[+-][HB](\d+)$/.exec(id)
+  return m ? RAIL_COLS.indexOf(Number(m[1])) : -1
+}
+/** Trou de rail voisin, `d` trous plus loin (borné aux extrémités). */
+export function railShift(id: string, d: number): string {
+  const j = Math.min(RAIL_HOLES - 1, Math.max(0, railIndex(id) + d))
+  return `${id.slice(0, 2)}${RAIL_COLS[j]}`
+}
+
 export interface Pt {
   x: number
   y: number
@@ -56,7 +71,7 @@ export interface Hole extends Pt {
 
 export const BB_HOLES: Hole[] = (() => {
   const out: Hole[] = []
-  for (const r of RAIL_ROWS) for (let k = 1; k <= RAIL_HOLES; k++) out.push({ id: `${r}${k}`, x: bbRailX(k), y: bbRowY(r) })
+  for (const r of RAIL_ROWS) for (let k = 1; k <= RAIL_HOLES; k++) out.push({ id: `${r}${RAIL_COLS[k - 1]}`, x: bbRailX(k), y: bbRowY(r) })
   for (const l of LETTERS) for (let c = 1; c <= COLS; c++) out.push({ id: `${l}${c}`, x: bbColX(c), y: bbRowY(l) })
   return out
 })()
@@ -67,7 +82,7 @@ export const isHole = (port: string) => BB_HOLE.has(port)
 export function holeLabel(id: string): string {
   const m = /^([+-])([HB])(\d+)$/.exec(id)
   if (!m) return id
-  return `rail ${m[1] === '+' ? '+' : '−'} du ${m[2] === 'H' ? 'haut' : 'bas'}, trou ${m[3]}`
+  return `rail ${m[1] === '+' ? '+' : '−'} du ${m[2] === 'H' ? 'haut' : 'bas'}, sous la colonne ${m[3]}`
 }
 
 /** Groupe de trous reliés sous la breadboard. */
@@ -90,8 +105,8 @@ export function stripLabel(strip: string): string {
 export function neighbourHole(id: string): string {
   const rail = /^([+-][HB])(\d+)$/.exec(id)
   if (rail) {
-    const k = Number(rail[2])
-    return `${rail[1]}${k + 3 <= RAIL_HOLES ? k + 3 : k - 3}`
+    const j = railIndex(id)
+    return railShift(id, j + 3 < RAIL_HOLES ? 3 : -3)
   }
   const m = /^([a-j])(\d+)$/.exec(id)!
   const c = Number(m[2])

@@ -31,8 +31,9 @@ Ci-dessous : les règles du format, un résumé lisible, puis le JSON complet de
 ## La breadboard (toujours là)
 - Trous : lettre + colonne, ex. "e25". Lignes a–e (moitié haute) et f–j (moitié basse), colonnes 1 à 62 (62 à GAUCHE, 1 à droite).
 - Sous la planche, les 5 trous d'une même colonne d'une moitié sont reliés : a25–e25 ensemble, f25–j25 ensemble (pas a25 avec f25).
-- Rails : "+H1"…"+H50", "-H1"…"-H50" (en haut), "+B1"…"+B50", "-B1"…"-B50" (en bas). Tout un rail est relié (ex. tous les "-B…").
-  Trou 1 du rail sous la colonne 60, trou 50 sous la colonne 3.
+- Rails : chaque trou de rail porte le numéro de la colonne au-dessus de laquelle il se trouve, de 60 (gauche) à 3 (droite).
+  50 trous par rail, par groupes de 5 : 60–56, 54–50, 48–44, 42–38, 36–32, 31–27, 25–21, 19–15, 13–9, 7–3 (pas de trou sous 55, 49, 43, 37, 26, 20, 14, 8).
+  "+H44" / "-H44" : rails du haut sous la colonne 44 ; "+B44" / "-B44" : rails du bas. Tout un rail est relié (ex. tous les "-B…").
 - Un trou ne prend qu'une seule patte.
 
 ## Ajouter une pièce « depuis le magasin »
@@ -171,7 +172,8 @@ export function parseImport(text: string, current: Session): ImportResult {
   if (!nodes.card && parts.some((p) => p.kind === 'W' && [p.a, p.b].some((e) => e && CARD_PIN.has(e))))
     out.warnings.push('Des fils vont sur la carte alors qu’elle n’est pas posée (nodes.card manquant) : ils seront invisibles.')
 
-  const session = normalize({ id: current.id, name: current.name, createdAt: current.createdAt, nodes, blocks, parts })
+  // Le mode d'emploi donne déjà les rails par colonne : pas de conversion à l'import.
+  const session = normalize({ id: current.id, name: current.name, createdAt: current.createdAt, nodes, blocks, parts, railNumbering: 'col' })
   if (blocks.includes('jack') && !parts.some((p) => p.kind === 'L')) out.warnings.push('Bloc jack sans ses fils : ils sont recréés, débranchés.')
   out.session = session
   return out

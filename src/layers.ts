@@ -1,7 +1,7 @@
 // Calques d'annotation : des repères posés par Claude (ou par l'app) par-dessus le montage,
 // stockés à part de la session. Chaque calque s'affiche ou se masque indépendamment.
 
-import { BB_HOLE, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, isHole, stripOf } from './geom'
+import { BB_HOLE, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, isHole, railIndex, stripOf } from './geom'
 import { portShort, type NodeId, type Session } from './model'
 
 export type Annotation =
@@ -89,13 +89,13 @@ export interface Focus {
 export function focusOf(s: Session, l: Layer): Focus {
   const ports = layerPorts(l)
   const strips = new Set(ports.filter((p) => isHole(p) && !/^[+-]/.test(p)).map(stripOf))
-  const rails = ports.map((p) => /^([+-][HB])(\d+)$/.exec(p)).filter((m): m is RegExpExecArray => !!m)
+  const rails = ports.filter((p) => railIndex(p) >= 0)
   const near = (port: string | null) => {
     if (!port) return false
     if (ports.includes(port)) return true
     if (isHole(port) && !/^[+-]/.test(port)) return strips.has(stripOf(port))
-    const m = /^([+-][HB])(\d+)$/.exec(port)
-    return !!m && rails.some((r) => r[1] === m[1] && Math.abs(Number(r[2]) - Number(m[2])) <= 2)
+    const j = railIndex(port)
+    return j >= 0 && rails.some((r) => r.slice(0, 2) === port.slice(0, 2) && Math.abs(railIndex(r) - j) <= 2)
   }
   const parts = new Set<string>()
   for (const p of s.parts) if (near(p.kind === 'L' ? p.b : p.a) || near(p.b)) parts.add(p.id)

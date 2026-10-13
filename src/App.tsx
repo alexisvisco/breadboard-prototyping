@@ -149,7 +149,8 @@ function SessionPage({ id, go }: { id: string; go: (p: string) => void }) {
       .then((r) => {
         if (!r) return setMissing(true)
         const s = normalize(r.session)
-        lastSaved.current = JSON.stringify(s)
+        // On compare à ce que le serveur a vraiment : si normalize a converti quelque chose, ça s'enregistre.
+        lastSaved.current = JSON.stringify(r.session)
         setSession(s)
         rememberSession(s.id, s.name)
       })
