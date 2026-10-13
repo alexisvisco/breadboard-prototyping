@@ -449,7 +449,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
               <button key={t} onClick={() => setTab(t)} className={`flex-1 px-4 py-2.5 ${tab === t ? 'border-b-2 border-emerald-400 text-white' : 'text-white/50 hover:text-white/80'}`}>
                 {t === 'analyse' ? 'Analyse' : t === 'diff' ? 'Diff' : 'Versions'}
                 {t === 'diff' && dm && Object.keys(dm.marks).length + dm.ghosts.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-orange-400/80 px-1.5 text-xs text-[#0d1512]">{new Set([...Object.keys(dm.marks), ...dm.ghosts.map((g) => g.id)]).size}</span>
+                  <span className="ml-1.5 rounded-full bg-orange-400/80 px-1.5 text-xs text-[#0d1512]">{new Set([...Object.keys(dm.marks), ...dm.ghosts.map((g) => g.part.id)]).size}</span>
                 )}
                 {t === 'analyse' && counts.ko > 0 && <span className="ml-1.5 rounded-full bg-red-500/80 px-1.5 text-xs text-white">{counts.ko}</span>}
               </button>

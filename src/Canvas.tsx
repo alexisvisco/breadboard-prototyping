@@ -320,6 +320,47 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           )
         })}
 
+        {/* Diff : la version d'avant, en transparence, sous forme de vraies pièces. */}
+        {ghosts.map((g) => {
+          const p = g.part
+          const lead = p.kind === 'L' ? JACK_LEAD.get(p.id) : null
+          const A = lead ? (p.b ? portWorld(session, p.b) : null) : p.a ? portWorld(session, p.a) : null
+          if (!A) return null
+          const B = lead ? portWorld(session, p.id) : p.b ? portWorld(session, p.b) : null
+          const end = B ?? { x: A.x + 34, y: A.y + 46 }
+          const flexible = p.kind === 'W' || p.kind === 'L'
+          const sag = Math.max(30, Math.hypot(end.x - A.x, end.y - A.y) * 0.18)
+          const curve = `M${A.x},${A.y} C${A.x + (end.x - A.x) * 0.25},${Math.max(A.y, end.y) + sag} ${A.x + (end.x - A.x) * 0.75},${Math.max(A.y, end.y) + sag} ${end.x},${end.y}`
+          const mx = (A.x + end.x) / 2
+          const my = (A.y + end.y) / 2
+          const ang = (Math.atan2(end.y - A.y, end.x - A.x) * 180) / Math.PI
+          return (
+            <g key={`ghost-${p.id}`} pointerEvents="none">
+              {flexible ? (
+                <path d={curve} fill="none" stroke={g.tone} strokeWidth={14} strokeOpacity={0.25} strokeLinecap="round" />
+              ) : (
+                <line x1={A.x} y1={A.y} x2={end.x} y2={end.y} stroke={g.tone} strokeWidth={26} strokeOpacity={0.22} strokeLinecap="round" />
+              )}
+              <g opacity={0.42}>
+                {flexible ? (
+                  <>
+                    <path d={curve} fill="none" stroke="#fff" strokeWidth={7} strokeLinecap="round" />
+                    <path d={curve} fill="none" stroke={p.color} strokeWidth={5} strokeLinecap="round" />
+                  </>
+                ) : (
+                  <>
+                    <line x1={A.x} y1={A.y} x2={end.x} y2={end.y} stroke="#8a9096" strokeWidth={3} />
+                    <g transform={`translate(${mx},${my}) rotate(${ang})`}>
+                      <PartBody p={p} />
+                    </g>
+                  </>
+                )}
+                {[A, B].filter((q): q is Pt => !!q).map((q, i) => <circle key={i} cx={q.x} cy={q.y} r={7} fill="#fff" stroke="#14201c" strokeWidth={2} />)}
+              </g>
+              <Pill x={mx + 12} y={my + 24} text={g.label} color={g.tone} />
+            </g>
+          )
+        })}
         {session.parts.map((p) => {
           const anchorA = p.a ? portWorld(session, p.a) : null
           if (!anchorA) return null
@@ -378,20 +419,6 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           )
         })}
 
-        {ghosts.map((g) => {
-          const lead = g.kind === 'L' ? JACK_LEAD.get(g.id) : null
-          const A = (lead ? portWorld(session, g.id) : g.a ? portWorld(session, g.a) : null)
-          const B = lead ? (g.b ? portWorld(session, g.b) : null) : g.b ? portWorld(session, g.b) : null
-          if (!A) return null
-          const end = B ?? A
-          return (
-            <g key={`ghost-${g.id}`} pointerEvents="none">
-              <line x1={A.x} y1={A.y} x2={end.x} y2={end.y} stroke={g.color} strokeWidth={5} strokeDasharray="9 7" strokeLinecap="round" opacity={0.9} />
-              {[A, B].filter((p): p is Pt => !!p).map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={8} fill="none" stroke={g.color} strokeWidth={3} strokeDasharray="4 3" />)}
-              <Pill x={(A.x + end.x) / 2 + 10} y={(A.y + end.y) / 2 + 22} text={g.label} color={g.color} />
-            </g>
-          )
-        })}
         <Overlay session={session} layers={layers} portWorld={portWorld} />
       </g>
     </svg>
