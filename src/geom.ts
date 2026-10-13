@@ -120,7 +120,7 @@ export function neighbourHole(id: string): string {
 export const CARD_W = 420
 export const CARD_H = 575
 
-const LEFT_PINS = ['IO46', 'IO14', 'IO9', 'IO4?', 'IO15', 'IO16', 'SDA/IO17', 'SCL/IO18', 'IO8', 'IO3', '3V3', 'GND', 'VBAT']
+const LEFT_PINS = ['IO45', 'IO14', 'IO9', 'IO46', 'IO15', 'IO16', 'SDA/IO17', 'SCL/IO18', 'IO8', 'IO3', '3V3', 'GND', 'VBAT']
 const RIGHT_PINS = ['IO1', 'IO2', 'TXD', 'RXD', 'IO42', 'IO41', 'IO40', 'IO39', 'IO38', 'GND', '3V3', 'GND', '5V']
 
 export interface Pin extends Pt {
