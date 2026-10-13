@@ -9,7 +9,7 @@ import {
   BLOCKS, addBlock, diffMarks, addToBox, analyse, normalize, newSession, partName, placeText, removeBlock, summary, type BlockId, type NodeId,
   type Part, type Session,
 } from './model'
-import { deleteLayer, fetchLayers, putLayer, type Layer } from './layers'
+import { deleteLayer, fetchLayers, focusOf, putLayer, resolvePort, type Layer } from './layers'
 import { LayersPanel } from './LayersPanel'
 import { Search, type SearchHit } from './Search'
 import { DiffTab } from './DiffTab'
@@ -235,8 +235,36 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
       clearInterval(t)
     }
   }, [session.id])
+  // Calque en focus : le reste est grisé, la vue cadre la mesure.
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const focusLayer = layers.find((l) => l.id === focusId && l.visible) ?? null
+  const focus = useMemo(() => (focusLayer ? focusOf(session, focusLayer) : null), [focusLayer, session])
+  const focusLayerId = focusLayer?.id
+  useEffect(() => {
+    if (!focusLayerId || !focus) return
+    const pts = [
+      ...focus.ports.map((p) => portWorld(session, p)),
+      ...session.parts.filter((p) => focus.parts.has(p.id)).flatMap((p) => [p.a, p.b].map((e) => (e ? portWorld(session, e) : null))),
+    ].filter((p): p is { x: number; y: number } => !!p)
+    canvas.current?.fitPoints(pts)
+    // On ne recadre qu'au changement de calque, pas à chaque modification du montage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusLayerId])
+  const focusOn = (l: Layer | null) => {
+    if (l && !l.visible) toggleLayer(l)
+    setFocusId(l?.id ?? null)
+  }
+  const locatePort = (ref: string) => {
+    const port = resolvePort(ref)
+    const pos = port ? portWorld(session, port) : null
+    if (!pos || !port) return
+    canvas.current?.centerOn(pos)
+    pulse(port)
+  }
   const toggleLayer = (l: Layer) => {
     const next = { ...l, visible: !l.visible }
+    // Cocher un calque le met en focus ; le décocher sort du focus.
+    setFocusId(next.visible ? l.id : (f) => (f === l.id ? null : f))
     setLayers((ls) => ls.map((x) => (x.id === l.id ? next : x)))
     putLayer(session.id, next).catch(() => {})
   }
@@ -408,8 +436,16 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
             layers={layers}
             marks={dm?.marks}
             ghosts={dm?.ghosts}
+            focus={focus}
           />
-          <LayersPanel layers={layers} onToggle={toggleLayer} onDelete={removeLayer} />
+          <LayersPanel layers={layers} focusId={focusLayer?.id ?? null} onToggle={toggleLayer} onDelete={removeLayer} onFocus={focusOn} onLocate={locatePort} />
+          {focusLayer && (
+            <div className="absolute left-4 top-4 flex items-center gap-3 rounded-lg border border-yellow-300/50 bg-[#18211d]/95 px-3 py-2 text-sm shadow-lg">
+              <span className="h-2 w-2 rounded-full bg-yellow-300" />
+              <span>Focus : <b>{focusLayer.name}</b></span>
+              <button onClick={() => setFocusId(null)} className="rounded bg-white/10 px-2 py-0.5 hover:bg-white/20">Tout afficher</button>
+            </div>
+          )}
 
           <div className="absolute bottom-4 left-4 flex overflow-hidden rounded-lg border border-white/10 bg-[#18211d]/95 text-sm shadow-lg">
             <button className="px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.zoom(1 / 1.25)} title="Dézoomer">−</button>

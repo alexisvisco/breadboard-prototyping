@@ -58,12 +58,15 @@ Mets dans "a" et "b" les trous où vont ses deux pattes, ex. "a": "e25", "b": "e
 - Fils du câble jack (pièces "kind": "L", "a" = départ fixe, "b" = trou où le bout est planté ou null) : ${leads}.
 
 ## Calques d'annotation (facultatif, pour guider une mesure)
-{ "id": "mesure-1", "name": "Mesure 1", "description": "consigne affichée", "items": [
+{ "id": "mesure-1", "name": "Mesure 1",
+  "steps": [ "Débranche l'USB", "Multimètre en mode bip", { "text": "Pointe rouge", "port": "e25" }, { "text": "Pointe noire", "port": "e24" } ],
+  "description": "pourquoi / comment interpréter (replié sous « Pourquoi ? »)", "items": [
   { "type": "probe", "port": "e25", "color": "rouge", "label": "rouge" },
   { "type": "probe", "port": "e24", "color": "noir", "label": "noir" },
   { "type": "part", "part": "R2", "color": "orange", "label": "à vérifier" },
   { "type": "line", "from": "e21", "to": "-B20", "color": "bleu", "label": "fil à ajouter" },
   { "type": "note", "port": "IO9", "text": "doit lire ~2180" } ] }
+Étapes : courtes, une action chacune ; "port" ajoute un bouton qui montre le trou. Cocher un calque le met en « focus » (le reste est grisé).
 Ports acceptés : trous, noms de broches (IO9, GND, 3V3), fils jack (EAR_P, mic 1). Couleurs : rouge, noir, orange, bleu, vert, jaune, violet, blanc, rose, gris.
 
 ## Résumé lisible de l'état actuel
@@ -110,7 +113,7 @@ export function parseImport(text: string, current: Session): ImportResult {
         const refs = it.type === 'line' ? [it.from, it.to] : it.type === 'part' ? [] : [it.port]
         for (const r of refs) if (!resolvePort(String(r))) out.warnings.push(`Calque « ${L.name ?? i + 1} » : port inconnu « ${r} ».`)
       }
-      out.layers.push({ id: String(L.id ?? `import-${Date.now().toString(36)}-${i}`), name: String(L.name ?? `Calque ${i + 1}`), description: L.description, author: L.author ?? 'claude', visible: L.visible ?? true, items: L.items })
+      out.layers.push({ id: String(L.id ?? `import-${Date.now().toString(36)}-${i}`), name: String(L.name ?? `Calque ${i + 1}`), steps: Array.isArray(L.steps) ? L.steps : undefined, description: L.description, author: L.author ?? 'claude', visible: L.visible ?? true, items: L.items })
     })
   }
   if (!sess) {

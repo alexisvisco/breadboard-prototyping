@@ -54,12 +54,13 @@ docker run -p 3000:3000 -v breadboard-data:/data breadboard
 ## Calques d'annotation
 
 Stockés à part de la session (l'enregistrement automatique du navigateur ne les écrase pas), relus par l'app toutes les 3 s.
-Chacun se coche / décoche dans le panneau « Calques ».
+Chacun se coche / décoche dans le panneau « Calques ». Cocher un calque le met en **focus** : le reste du montage est grisé, la vue cadre la mesure, la colonne de chaque trou visé est surlignée et son nom écrit en gros. Les `steps` s'affichent en liste numérotée, avec un bouton 👁 par trou.
 
 ```bash
 curl -X PUT localhost:5173/api/sessions/<id>/layers/mesure-1 -H 'content-type: application/json' -d '{
   "name": "Mesure 1 · tension sur R2",
-  "description": "Multimètre sur V⎓ 20 V. On attend ~1,65 V.",
+  "steps": ["Carte branchée, multimètre sur V⎓ 20 V", {"text": "Pointe rouge", "port": "e25"}, {"text": "Pointe noire", "port": "e24"}],
+  "description": "On attend ~1,65 V (texte replié sous « Pourquoi ? »).",
   "items": [
     {"type": "probe", "port": "e25", "color": "rouge", "label": "rouge"},
     {"type": "probe", "port": "e24", "color": "noir",  "label": "noir"},

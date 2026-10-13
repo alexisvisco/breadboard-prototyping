@@ -8,12 +8,14 @@ import {
 } from './geom'
 import { BLOCKS, POLAR, type Ghost, portLabel, resistorBands, type BlockId, type NodeId, type Part, type Session } from './model'
 import { rotateNode } from './ContextMenu'
-import type { Layer } from './layers'
+import type { Focus, Layer } from './layers'
 import { BreadboardNode, CardNode, FlipProvider, JackNode } from './nodes'
 import { Overlay, Pill } from './Overlay'
 
 export interface CanvasApi {
   centerOn(p: Pt): void
+  /** Cadre la vue sur ces points (avec une marge), sans dépasser un zoom confortable. */
+  fitPoints(pts: Pt[]): void
   fit(): void
   zoom(f: number): void
 }
@@ -75,9 +77,11 @@ interface Props {
   /** Diff : couleur par pièce changée, et anciennes places. */
   marks?: Record<string, string>
   ghosts?: Ghost[]
+  /** Calque en focus : le reste est grisé. */
+  focus?: Focus | null
 }
 
-export function Canvas({ session, onChange, selected, setSelected, highlight, flash, apiRef, onHover, onContext, layers, marks = {}, ghosts = [] }: Props) {
+export function Canvas({ session, onChange, selected, setSelected, highlight, flash, apiRef, onHover, onContext, layers, marks = {}, ghosts = [], focus = null }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [view, setView] = useState({ tx: 40, ty: 80, s: 0.5 })
   const viewRef = useRef(view)
@@ -112,6 +116,18 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
 
   useImperativeHandle(apiRef, () => ({
     fit,
+    fitPoints(pts) {
+      const r = svgRef.current?.getBoundingClientRect()
+      if (!r || !pts.length) return
+      const xs = pts.map((p) => p.x)
+      const ys = pts.map((p) => p.y)
+      const pad = 140
+      const [x0, x1, y0, y1] = [Math.min(...xs) - pad, Math.max(...xs) + pad, Math.min(...ys) - pad, Math.max(...ys) + pad]
+      // Laisse de la place à droite pour le panneau des calques.
+      const w = r.width - 380
+      const s = Math.min(w / (x1 - x0), r.height / (y1 - y0), 1.6)
+      setView({ s, tx: (w - (x1 - x0) * s) / 2 - x0 * s, ty: (r.height - (y1 - y0) * s) / 2 - y0 * s })
+    },
     centerOn(p) {
       const r = svgRef.current!.getBoundingClientRect()
       const s = Math.max(viewRef.current.s, 1.1)
@@ -309,7 +325,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           if (!pos) return null
           const { w, h } = BLOCKS[id]
           return (
-            <g key={id} data-node={id} transform={`translate(${pos.x},${pos.y}) rotate(${pos.rot},${w / 2},${h / 2})`}>
+            <g key={id} data-node={id} transform={`translate(${pos.x},${pos.y}) rotate(${pos.rot},${w / 2},${h / 2})`} opacity={focus && !focus.nodes.has(id) ? 0.3 : 1}>
               {selected === `node:${id}` && (
                 <rect x={-10} y={-44} width={w + 20} height={h + 54} rx={18} fill="none" stroke="#ffd43b" strokeWidth={3} strokeDasharray="10 7" />
               )}
@@ -385,7 +401,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           const my = (A.y + B.y) / 2
           const ang = (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI
           return (
-            <g key={p.id} data-part={p.id} style={{ cursor: 'pointer' }}>
+            <g key={p.id} data-part={p.id} style={{ cursor: 'pointer' }} opacity={focus && !focus.parts.has(p.id) ? 0.13 : 1}>
               {glow &&
                 (flexible ? (
                   <path d={path} fill="none" stroke={glow} strokeWidth={mark && !isSel && !isHl ? 18 : 15} strokeOpacity={0.6} strokeLinecap="round" />
@@ -423,6 +439,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
 
         {/* Noms des fils du jack : au-dessus des fils, toujours à l'endroit. */}
         {nodes.jack &&
+          (!focus || focus.nodes.has('jack')) &&
           JACK_LEADS.map((l, i) => {
             const p = nodeWorld(session, 'jack', { x: l.x, y: l.y + 24 + (i % 2) * 14 })!
             const text = l.label.replace(' écouteur', '').replace(' micro', '')
@@ -432,7 +449,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
               </text>
             )
           })}
-        <Overlay session={session} layers={layers} portWorld={portWorld} />
+        <Overlay session={session} layers={layers} portWorld={portWorld} scale={view.s} />
       </g>
     </svg>
   )
