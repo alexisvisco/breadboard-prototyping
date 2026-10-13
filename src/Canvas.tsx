@@ -3,13 +3,13 @@
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import {
-  BB_HOLE, BB_HOLES, CARD_JACK, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_PLUG, holeLabel, isHole, localToWorld, neighbourHole,
+  BB_HOLE, BB_HOLES, CARD_JACK, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, JACK_PLUG, holeLabel, isHole, localToWorld, neighbourHole,
   stripLabel, stripOf, type Pos, type Pt,
 } from './geom'
 import { BLOCKS, POLAR, type Ghost, portLabel, resistorBands, type BlockId, type NodeId, type Part, type Session } from './model'
 import { rotateNode } from './ContextMenu'
 import type { Layer } from './layers'
-import { BreadboardNode, CardNode, JackNode } from './nodes'
+import { BreadboardNode, CardNode, FlipProvider, JackNode } from './nodes'
 import { Overlay, Pill } from './Overlay'
 
 export interface CanvasApi {
@@ -313,9 +313,11 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
               {selected === `node:${id}` && (
                 <rect x={-10} y={-44} width={w + 20} height={h + 54} rx={18} fill="none" stroke="#ffd43b" strokeWidth={3} strokeDasharray="10 7" />
               )}
-              {id === 'bb' && <BreadboardNode hover={hover} flash={flash} />}
-              {id === 'card' && <CardNode hover={hover} flash={flash} />}
-              {id === 'jack' && <JackNode colors={leadColors} />}
+              <FlipProvider value={pos.rot === 180 || pos.rot === 270}>
+                {id === 'bb' && <BreadboardNode hover={hover} flash={flash} />}
+                {id === 'card' && <CardNode hover={hover} flash={flash} />}
+                {id === 'jack' && <JackNode colors={leadColors} />}
+              </FlipProvider>
             </g>
           )
         })}
@@ -419,6 +421,17 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           )
         })}
 
+        {/* Noms des fils du jack : au-dessus des fils, toujours à l'endroit. */}
+        {nodes.jack &&
+          JACK_LEADS.map((l, i) => {
+            const p = nodeWorld(session, 'jack', { x: l.x, y: l.y + 24 + (i % 2) * 14 })!
+            const text = l.label.replace(' écouteur', '').replace(' micro', '')
+            return (
+              <text key={`lbl-${l.id}`} x={p.x} y={p.y + 4} fontSize={11} fontWeight={600} textAnchor="middle" fill="#e6ece8" stroke="#101614" strokeWidth={4} paintOrder="stroke" pointerEvents="none" fontFamily="JetBrains Mono, ui-monospace, monospace">
+                {text}
+              </text>
+            )
+          })}
         <Overlay session={session} layers={layers} portWorld={portWorld} />
       </g>
     </svg>
