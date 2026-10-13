@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --color-board: #f3f1ea;
+  --color-board-edge: #cfc9b8;
+  --color-hole: #9a9586;
+  --color-pcb: #c8172b;
+}
+
+html, body, #root { height: 100%; }
+body { margin: 0; background: #14201c; color: #e6ece8; }
