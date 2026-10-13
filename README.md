@@ -72,3 +72,7 @@ curl -X PUT localhost:5173/api/sessions/<id>/layers/mesure-1 -H 'content-type: a
 
 Ports : trous (`e25`, `+H7`, `-B30`), broches de la carte par nom (`IO9`, `GND`, `3V3`), fils du jack (`EAR_P`, `mic 1`…).
 Couleurs : `rouge`, `noir`, `orange`, `bleu`, `vert`, `jaune`, `violet`, `blanc`, `rose`, `gris` ou hexadécimal.
+
+## Déploiement
+
+En ligne sur https://breadboard.srv.alexisvis.co (Coolify, base Postgres). Chaque push sur `main` redéploie automatiquement (webhook GitHub → Coolify).
