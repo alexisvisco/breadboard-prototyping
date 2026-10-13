@@ -6,12 +6,13 @@ import { DialogHost, ask, confirmAsk, tell } from './dialog'
 import { Canvas, nodeCenter, portWorld, type CanvasApi } from './Canvas'
 import { ContextMenu, rotateNode, unplacePart } from './ContextMenu'
 import {
-  BLOCKS, addBlock, addToBox, analyse, normalize, newSession, partName, placeText, removeBlock, summary, type BlockId, type NodeId,
+  BLOCKS, addBlock, diffMarks, addToBox, analyse, normalize, newSession, partName, placeText, removeBlock, summary, type BlockId, type NodeId,
   type Part, type Session,
 } from './model'
 import { deleteLayer, fetchLayers, putLayer, type Layer } from './layers'
 import { LayersPanel } from './LayersPanel'
 import { Search, type SearchHit } from './Search'
+import { DiffTab } from './DiffTab'
 import { ImportDialog } from './ImportDialog'
 import { Shop } from './Shop'
 import { Versions } from './Versions'
@@ -215,7 +216,8 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
   const [flash, setFlash] = useState<string | null>(null)
   const [highlight, setHighlight] = useState<string[]>([])
   const [menu, setMenu] = useState<{ target: string; x: number; y: number } | null>(null)
-  const [tab, setTab] = useState<'analyse' | 'versions'>('analyse')
+  const [tab, setTab] = useState<'analyse' | 'diff' | 'versions'>('analyse')
+  const [diffBase, setDiffBase] = useState<Session | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const canvas = useRef<CanvasApi>(null)
   const [layers, setLayers] = useState<Layer[]>([])
@@ -244,6 +246,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
   }
 
   const analysis = useMemo(() => analyse(session), [session])
+  const dm = useMemo(() => (tab === 'diff' && diffBase ? diffMarks(diffBase, session) : null), [tab, diffBase, session])
   const update = useCallback((fn: (s: Session) => Session) => setSession((s) => (s ? fn(s) : s)), [setSession])
   const closeMenu = useCallback(() => setMenu(null), [])
 
@@ -403,6 +406,8 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
             onHover={setHoverText}
             onContext={(target, x, y) => setMenu({ target, x, y })}
             layers={layers}
+            marks={dm?.marks}
+            ghosts={dm?.ghosts}
           />
           <LayersPanel layers={layers} onToggle={toggleLayer} onDelete={removeLayer} />
 
@@ -440,9 +445,12 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
 
         <aside className="flex w-[360px] shrink-0 flex-col border-l border-white/10 bg-[#141c19]">
           <div className="flex border-b border-white/10 text-sm">
-            {(['analyse', 'versions'] as const).map((t) => (
+            {(['analyse', 'diff', 'versions'] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`flex-1 px-4 py-2.5 ${tab === t ? 'border-b-2 border-emerald-400 text-white' : 'text-white/50 hover:text-white/80'}`}>
-                {t === 'analyse' ? 'Analyse' : 'Versions'}
+                {t === 'analyse' ? 'Analyse' : t === 'diff' ? 'Diff' : 'Versions'}
+                {t === 'diff' && dm && Object.keys(dm.marks).length + dm.ghosts.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-orange-400/80 px-1.5 text-xs text-[#0d1512]">{new Set([...Object.keys(dm.marks), ...dm.ghosts.map((g) => g.id)]).size}</span>
+                )}
                 {t === 'analyse' && counts.ko > 0 && <span className="ml-1.5 rounded-full bg-red-500/80 px-1.5 text-xs text-white">{counts.ko}</span>}
               </button>
             ))}
@@ -482,6 +490,8 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
                 </ul>
                 <p className="mt-4 text-xs leading-relaxed text-white/40">Survole une ligne pour voir les pièces concernées sur le canevas.</p>
               </>
+            ) : tab === 'diff' ? (
+              <DiffTab key={versionsKey} session={session} onBase={setDiffBase} onHighlight={setHighlight} />
             ) : (
               <Versions key={versionsKey} session={session} onRestore={(s) => update(() => s)} onHighlight={setHighlight} />
             )}

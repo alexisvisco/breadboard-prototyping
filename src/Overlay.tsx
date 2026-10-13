@@ -10,7 +10,7 @@ interface Props {
   portWorld: (s: Session, port: string) => Pt | null
 }
 
-function Pill({ x, y, text, color }: { x: number; y: number; text: string; color: string }) {
+export function Pill({ x, y, text, color }: { x: number; y: number; text: string; color: string }) {
   const w = text.length * 7.4 + 16
   const dark = ['#ffffff', '#ffd60a'].includes(color)
   return (

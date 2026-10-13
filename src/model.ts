@@ -433,3 +433,39 @@ export function diffSessions(from: Session, to: Session): Diff {
   const lb = links(analyse(to))
   return { lines, linksAdded: [...lb].filter((l) => !la.has(l)), linksRemoved: [...la].filter((l) => !lb.has(l)) }
 }
+
+// ------------------------------------------------------------------ diff affiché sur le canevas
+
+export const DIFF_COLORS = { add: '#40c057', mod: '#ff922b', del: '#fa5252' }
+
+/** Ancienne place d'une pièce (retirée ou déplacée), dessinée en pointillé. */
+export interface Ghost {
+  id: string
+  label: string
+  a: string | null
+  b: string | null
+  kind: Kind
+  color: string
+}
+
+/** Couleur de chaque pièce actuelle qui a changé depuis `old`, et fantômes des anciennes places. */
+export function diffMarks(old: Session, cur: Session): { marks: Record<string, string>; ghosts: Ghost[] } {
+  const marks: Record<string, string> = {}
+  const ghosts: Ghost[] = []
+  const before = new Map(old.parts.map((p) => [p.id, p]))
+  const now = new Map(cur.parts.map((p) => [p.id, p]))
+  for (const p of cur.parts) {
+    if (!isPlaced(p)) continue
+    const o = before.get(p.id)
+    if (!o || !isPlaced(o)) marks[p.id] = DIFF_COLORS.add
+    else if (o.a !== p.a || o.b !== p.b) {
+      marks[p.id] = DIFF_COLORS.mod
+      ghosts.push({ id: p.id, label: `${p.label} avant`, a: o.a, b: o.b, kind: o.kind, color: DIFF_COLORS.mod })
+    } else if (o.value !== p.value || o.color !== p.color || o.label !== p.label) marks[p.id] = DIFF_COLORS.mod
+  }
+  for (const o of old.parts) {
+    const p = now.get(o.id)
+    if (isPlaced(o) && (!p || !isPlaced(p))) ghosts.push({ id: o.id, label: `${o.label} retiré`, a: o.a, b: o.b, kind: o.kind, color: DIFF_COLORS.del })
+  }
+  return { marks, ghosts }
+}

@@ -5,6 +5,7 @@ Recopier un montage électronique dans le navigateur, pour apprendre et diagnost
 - **Session** = un identifiant aléatoire dans l'URL (`/s/<uuid>`). Pas de compte : qui a le lien peut lire et modifier.
 - **Magasin** → **boîte** de la session → **canevas** : on ajoute à sa boîte ce qu'on a chez soi (résistances, condensateurs, LED, diodes, boutons, fils Dupont, carte Makerfabs ESP32-S3 4G, câble jack), puis on glisse chaque pièce sur la breadboard.
 - **Analyse** : courts-circuits d'alimentation, pièce dont les deux pattes sont reliées, deux pattes dans un trou, fil branché d'un seul côté, patte reliée à rien ; liste de ce qui est relié ensemble.
+- **Diff** : choisis une version, tout ce qui a changé depuis s'affiche d'un coup sur le canevas (vert ajouté, orange déplacé / modifié avec son ancienne place en pointillé, rouge pointillé retiré).
 - **Versions** : instantanés nommés, comparaison (pièces ajoutées / déplacées / retirées et liaisons électriques gagnées / perdues), restauration.
 - Clic droit sur une pièce ou un bloc : couleur des fils, valeur, sens, rotation (aussi touche `R`), ranger, supprimer.
 

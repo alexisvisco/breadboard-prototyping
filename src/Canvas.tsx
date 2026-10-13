@@ -6,11 +6,11 @@ import {
   BB_HOLE, BB_HOLES, CARD_JACK, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_PLUG, holeLabel, isHole, localToWorld, neighbourHole,
   stripLabel, stripOf, type Pos, type Pt,
 } from './geom'
-import { BLOCKS, POLAR, portLabel, resistorBands, type BlockId, type NodeId, type Part, type Session } from './model'
+import { BLOCKS, POLAR, type Ghost, portLabel, resistorBands, type BlockId, type NodeId, type Part, type Session } from './model'
 import { rotateNode } from './ContextMenu'
 import type { Layer } from './layers'
 import { BreadboardNode, CardNode, JackNode } from './nodes'
-import { Overlay } from './Overlay'
+import { Overlay, Pill } from './Overlay'
 
 export interface CanvasApi {
   centerOn(p: Pt): void
@@ -72,9 +72,12 @@ interface Props {
   onHover: (text: string | null) => void
   onContext: (target: string, x: number, y: number) => void
   layers: Layer[]
+  /** Diff : couleur par pièce changée, et anciennes places. */
+  marks?: Record<string, string>
+  ghosts?: Ghost[]
 }
 
-export function Canvas({ session, onChange, selected, setSelected, highlight, flash, apiRef, onHover, onContext, layers }: Props) {
+export function Canvas({ session, onChange, selected, setSelected, highlight, flash, apiRef, onHover, onContext, layers, marks = {}, ghosts = [] }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [view, setView] = useState({ tx: 40, ty: 80, s: 0.5 })
   const viewRef = useRef(view)
@@ -328,6 +331,8 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           const B = dragging && m.end === 'b' ? dragPos : Bfixed
           const isSel = p.id === selected
           const isHl = highlight.includes(p.id) || flash === p.id
+          const mark = marks[p.id]
+          const glow = isHl ? '#ff6b6b' : isSel ? '#ffd43b' : mark
           const flexible = p.kind === 'W' || p.kind === 'L'
           const sag = Math.max(30, Math.hypot(B.x - A.x, B.y - A.y) * 0.18)
           const wire = `M${A.x},${A.y} C${A.x + (B.x - A.x) * 0.25},${Math.max(A.y, B.y) + sag} ${A.x + (B.x - A.x) * 0.75},${Math.max(A.y, B.y) + sag} ${B.x},${B.y}`
@@ -338,11 +343,11 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           const ang = (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI
           return (
             <g key={p.id} data-part={p.id} style={{ cursor: 'pointer' }}>
-              {(isSel || isHl) &&
+              {glow &&
                 (flexible ? (
-                  <path d={path} fill="none" stroke={isHl ? '#ff6b6b' : '#ffd43b'} strokeWidth={15} strokeOpacity={0.6} strokeLinecap="round" />
+                  <path d={path} fill="none" stroke={glow} strokeWidth={mark && !isSel && !isHl ? 18 : 15} strokeOpacity={0.6} strokeLinecap="round" />
                 ) : (
-                  <line x1={A.x} y1={A.y} x2={B.x} y2={B.y} stroke={isHl ? '#ff6b6b' : '#ffd43b'} strokeWidth={26} strokeOpacity={0.6} strokeLinecap="round" />
+                  <line x1={A.x} y1={A.y} x2={B.x} y2={B.y} stroke={glow} strokeWidth={mark && !isSel && !isHl ? 32 : 26} strokeOpacity={0.6} strokeLinecap="round" />
                 ))}
               {flexible ? (
                 <>
@@ -373,6 +378,20 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           )
         })}
 
+        {ghosts.map((g) => {
+          const lead = g.kind === 'L' ? JACK_LEAD.get(g.id) : null
+          const A = (lead ? portWorld(session, g.id) : g.a ? portWorld(session, g.a) : null)
+          const B = lead ? (g.b ? portWorld(session, g.b) : null) : g.b ? portWorld(session, g.b) : null
+          if (!A) return null
+          const end = B ?? A
+          return (
+            <g key={`ghost-${g.id}`} pointerEvents="none">
+              <line x1={A.x} y1={A.y} x2={end.x} y2={end.y} stroke={g.color} strokeWidth={5} strokeDasharray="9 7" strokeLinecap="round" opacity={0.9} />
+              {[A, B].filter((p): p is Pt => !!p).map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={8} fill="none" stroke={g.color} strokeWidth={3} strokeDasharray="4 3" />)}
+              <Pill x={(A.x + end.x) / 2 + 10} y={(A.y + end.y) / 2 + 22} text={g.label} color={g.color} />
+            </g>
+          )
+        })}
         <Overlay session={session} layers={layers} portWorld={portWorld} />
       </g>
     </svg>
