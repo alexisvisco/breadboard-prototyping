@@ -52,6 +52,9 @@ Mets dans "a" et "b" les trous où vont ses deux pattes, ex. "a": "e25", "b": "e
 - Les deux pattes d'une pièce doivent être dans deux groupes de trous différents, sinon elle est court-circuitée.
 - Pièces à 3 ou 4 pattes (POT, NPN, PNP, NMOS, REG, SERVO, RGB, SONAR) : "a", "b", "c" (et "d") dans l'ordre des noms ci-dessus ; les pattes se posent côte à côte (ex. "a": "e25", "b": "e24", "c": "e23"), dans trois colonnes différentes. Toutes posées, ou aucune.
 - W (fil Dupont) : "a" et "b" = un trou ou une broche de la carte. "b": null = bout libre.
+  Courbure facultative d'un fil : "bend" (nombre de pixels, ex. 80 ou -120). Le milieu du fil s'écarte de cette distance de la ligne droite a→b ;
+  positif = côté droit en allant de "a" vers "b" (à l'écran, a à gauche et b à droite : positif = vers le bas). Un trou = 24 px. 0 = fil tendu.
+  Sans "bend", le fil pend naturellement sous ses deux bouts. Sers-toi de "bend" pour que les fils ne se croisent pas et ne cachent pas les trous ; l'utilisateur peut aussi les courber à la main.
 - Remettre une pièce dans la boîte : "a": null, "b": null.
 
 ## Blocs (carte, câble jack)
@@ -195,6 +198,7 @@ export function parseImport(text: string, current: Session): ImportResult {
       label: name,
       value: p.value === undefined || p.value === null ? undefined : String(p.value),
       color: String(p.color ?? (kind === 'L' ? JACK_LEAD.get(id)!.color : (shop?.color ?? '#888888'))),
+      ...(kind === 'W' && Number.isFinite(Number(p.bend)) && p.bend !== null && p.bend !== '' ? { bend: Math.max(-800, Math.min(800, Math.round(Number(p.bend)))) } : {}),
       a: at.a ?? (kind === 'W' ? (at.b ?? null) : null),
       b: kind === 'W' && !at.a ? null : (at.b ?? null),
     }

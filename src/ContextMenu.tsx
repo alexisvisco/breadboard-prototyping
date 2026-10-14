@@ -97,6 +97,13 @@ export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
         {POLAR.includes(p.kind) && p.a && (
           <button className={item} onClick={act(() => setPart(p.id, { a: p.b, b: p.a }))}>Inverser le sens (+ / −)</button>
         )}
+        {p.kind === 'W' && p.b && (
+          <>
+            <button className={item} onClick={act(() => setPart(p.id, { bend: Math.round((p.bend ?? 0) + 60) }))}>Courber le fil ↷ <span className="float-right text-white/35">+60</span></button>
+            <button className={item} onClick={act(() => setPart(p.id, { bend: Math.round((p.bend ?? 0) - 60) }))}>Courber le fil ↶ <span className="float-right text-white/35">−60</span></button>
+            {p.bend !== undefined && <button className={item} onClick={act(() => setPart(p.id, { bend: undefined }))}>Remettre le pendant naturel</button>}
+          </>
+        )}
         {legCount(p.kind) > 2 && p.a && (
           <button className={item} onClick={act(() => setPart(p.id, legCount(p.kind) === 3 ? { a: p.c ?? null, c: p.a } : { a: p.d ?? null, d: p.a, b: p.c ?? null, c: p.b }))}>Retourner (première ↔ dernière patte)</button>
         )}

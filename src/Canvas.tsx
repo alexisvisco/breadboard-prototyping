@@ -72,10 +72,40 @@ export function portDescription(port: string): string {
   return portLabel(port)
 }
 
+/**
+ * Tracé d'un fil entre A et B. Sans `bend` : il pend sous les deux bouts. Avec `bend` : le milieu du fil s'écarte de `bend` px de la droite A–B
+ * (positif = côté droit en allant de A vers B). Renvoie aussi le milieu de la courbe et la normale, pour la poignée de courbure.
+ */
+export function wireCurve(A: Pt, B: Pt, bend?: number) {
+  const dx = B.x - A.x
+  const dy = B.y - A.y
+  const len = Math.hypot(dx, dy) || 1
+  const n = { x: -dy / len, y: dx / len }
+  let c1: Pt
+  let c2: Pt
+  if (bend === undefined) {
+    const sag = Math.max(30, len * 0.18)
+    const low = Math.max(A.y, B.y) + sag
+    c1 = { x: A.x + dx * 0.25, y: low }
+    c2 = { x: A.x + dx * 0.75, y: low }
+  } else {
+    const k = bend / 0.75
+    c1 = { x: A.x + dx * 0.25 + n.x * k, y: A.y + dy * 0.25 + n.y * k }
+    c2 = { x: A.x + dx * 0.75 + n.x * k, y: A.y + dy * 0.75 + n.y * k }
+  }
+  return {
+    d: `M${A.x},${A.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${B.x},${B.y}`,
+    mid: { x: (A.x + 3 * c1.x + 3 * c2.x + B.x) / 8, y: (A.y + 3 * c1.y + 3 * c2.y + B.y) / 8 },
+    n,
+    chordMid: { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 },
+  }
+}
+
 type Mode =
   | { type: 'pan'; sx: number; sy: number; tx: number; ty: number; moved: boolean }
   | { type: 'node'; id: NodeId; dx: number; dy: number; sx: number; sy: number; moved: boolean }
   | { type: 'end'; partId: string; end: Leg; pins: boolean }
+  | { type: 'bend'; partId: string }
 
 interface Props {
   session: Session
@@ -200,6 +230,13 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       return
     }
     svgRef.current!.setPointerCapture(e.pointerId)
+    const bendEl = t.closest('[data-bend]')
+    if (bendEl) {
+      const partId = bendEl.getAttribute('data-bend')!
+      mode.current = { type: 'bend', partId }
+      setSelected(partId)
+      return
+    }
     const handle = t.closest('[data-handle]')
     if (handle) {
       const [partId, end] = handle.getAttribute('data-handle')!.split('|')
@@ -244,6 +281,14 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       m.moved = m.moved || Math.abs(e.clientX - m.sx) + Math.abs(e.clientY - m.sy) > 3
       if (m.moved)
         onChange((s) => ({ ...s, nodes: { ...s.nodes, [m.id]: { ...s.nodes[m.id]!, x: Math.round(w.x - m.dx), y: Math.round(w.y - m.dy) } } }))
+    } else if (m.type === 'bend') {
+      const part = session.parts.find((p) => p.id === m.partId)
+      const A = part?.a ? portWorld(session, part.a) : null
+      const B = part?.b ? portWorld(session, part.b) : null
+      if (!A || !B) return
+      const { n, chordMid } = wireCurve(A, B, 0)
+      const bend = Math.max(-800, Math.min(800, Math.round((w.x - chordMid.x) * n.x + (w.y - chordMid.y) * n.y)))
+      setPart(m.partId, { bend })
     } else {
       setDragPos(w)
     }
@@ -263,6 +308,12 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     if (m?.type === 'pan' && !m.moved) setSelected(null)
     setDragPos(null)
     svgRef.current?.releasePointerCapture(e.pointerId)
+  }
+
+  // Double-clic sur la poignée de courbure : le fil reprend son pendant naturel.
+  function onDoubleClick(e: React.MouseEvent) {
+    const id = (e.target as Element).closest('[data-bend]')?.getAttribute('data-bend')
+    if (id) setPart(id, { bend: undefined })
   }
 
   function onContextMenu(e: React.MouseEvent) {
@@ -320,6 +371,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       onPointerCancel={() => { mode.current = null; setDragPos(null) }}
       onPointerLeave={() => { setHover(null); onHover(null) }}
       onContextMenu={onContextMenu}
+      onDoubleClick={onDoubleClick}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
     >
@@ -451,8 +503,8 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
               </g>
             )
           }
-          const sag = Math.max(30, Math.hypot(B.x - A.x, B.y - A.y) * 0.18)
-          const wire = `M${A.x},${A.y} C${A.x + (B.x - A.x) * 0.25},${Math.max(A.y, B.y) + sag} ${A.x + (B.x - A.x) * 0.75},${Math.max(A.y, B.y) + sag} ${B.x},${B.y}`
+          const curve = wireCurve(A, B, p.kind === 'W' ? p.bend : undefined)
+          const wire = curve.d
           const lA = p.kind === 'L' && lead ? nodeWorld(session, 'jack', { x: lead.x, y: lead.y + 50 })! : A
           const path = p.kind === 'L' ? `M${A.x},${A.y} C${lA.x},${lA.y} ${B.x},${B.y + 60} ${B.x},${B.y}` : wire
           const mx = (A.x + B.x) / 2
@@ -483,6 +535,12 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
                   )}
                   <text x={mx} y={my - 18} fontSize={12} fontWeight={700} textAnchor="middle" fill="#14201c" stroke="#f3f1ea" strokeWidth={4} paintOrder="stroke">{p.label}</text>
                 </>
+              )}
+              {p.kind === 'W' && isSel && p.b && !dragging && (
+                <g data-bend={p.id} style={{ cursor: 'grab' }}>
+                  <title>Glisser pour courber le fil · double-clic : remettre droit</title>
+                  <rect x={curve.mid.x - 7} y={curve.mid.y - 7} width={14} height={14} transform={`rotate(45 ${curve.mid.x} ${curve.mid.y})`} fill="#ffd43b" stroke="#14201c" strokeWidth={2.5} />
+                </g>
               )}
               {(['a', 'b'] as const).map((k) => {
                 if (p.kind === 'L' && k === 'a') return null

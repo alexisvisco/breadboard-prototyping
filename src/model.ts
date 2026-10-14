@@ -54,6 +54,8 @@ export interface Part {
   /** 3e et 4e pattes (potentiomètre, transistor, RGB…). */
   c?: string | null
   d?: string | null
+  /** Fil Dupont : courbure en pixels (écart du milieu du fil par rapport à la ligne droite, + = côté droit en allant de a vers b). Absent = pendant naturel. */
+  bend?: number
 }
 
 export interface Session {
@@ -561,6 +563,7 @@ export function diffSessions(from: Session, to: Session): Diff {
       else ch.push(`${placeText(o)} → ${placeText(p)}`)
     }
     if (o.value !== p.value) ch.push(`valeur ${o.value ?? '—'} → ${p.value ?? '—'}`)
+    if (o.bend !== p.bend) ch.push(`courbure ${o.bend ?? 'auto'} → ${p.bend ?? 'auto'}`)
     if (o.color !== p.color) ch.push(`couleur ${colorName(o.color)} → ${colorName(p.color)}`)
     if (o.label !== p.label) ch.push(`renommé ${o.label} → ${p.label}`)
     if (ch.length) lines.push({ type: 'mod', text: `${partName(p)} : ${ch.join(' · ')}`, partId: p.id })
@@ -599,7 +602,7 @@ export function diffMarks(old: Session, cur: Session): { marks: Record<string, s
     else if (!sameLegs(o, p)) {
       marks[p.id] = DIFF_COLORS.mod
       ghosts.push({ part: o, label: `${p.label} avant`, tone: DIFF_COLORS.mod })
-    } else if (o.value !== p.value || o.color !== p.color || o.label !== p.label) marks[p.id] = DIFF_COLORS.mod
+    } else if (o.value !== p.value || o.color !== p.color || o.label !== p.label || o.bend !== p.bend) marks[p.id] = DIFF_COLORS.mod
   }
   for (const o of old.parts) {
     const p = now.get(o.id)
