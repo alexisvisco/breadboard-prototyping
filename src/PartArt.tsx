@@ -79,7 +79,7 @@ export function PartBody({ p }: { p: Look }) {
     case 'BZ':
       return (
         <>
-          <circle r={14} fill="#1a1a1a" stroke="#000" />
+          <circle r={14} fill={p.color} stroke="#000" />
           <circle r={3.5} fill="#444" />
           <text x={-12} y={-5} fontSize={11} fontWeight={800} fill="#ffd43b">+</text>
         </>
@@ -127,7 +127,7 @@ export function MultiBody({ p }: { p: Look }) {
     case 'NMOS':
       return (
         <>
-          <path d="M-14,10 L-14,-2 A14,14 0 0 1 14,-2 L14,10 Z" fill="#232323" stroke="#000" />
+          <path d="M-14,10 L-14,-2 A14,14 0 0 1 14,-2 L14,10 Z" fill={p.color} stroke="#000" />
           <text y={7} fontSize={7.5} textAnchor="middle" fill="#e9ecef" fontFamily="JetBrains Mono, ui-monospace, monospace">{p.value?.slice(0, 7) ?? p.kind}</text>
         </>
       )
@@ -136,7 +136,7 @@ export function MultiBody({ p }: { p: Look }) {
         <>
           <rect x={-16} y={-18} width={32} height={9} rx={1} fill="#b9bfc6" stroke="#7d828a" />
           <circle cy={-13.5} r={2.4} fill="#555" />
-          <rect x={-16} y={-9} width={32} height={19} fill="#232323" stroke="#000" />
+          <rect x={-16} y={-9} width={32} height={19} fill={p.color} stroke="#000" />
           <text y={5} fontSize={7} textAnchor="middle" fill="#e9ecef" fontFamily="JetBrains Mono, ui-monospace, monospace">{p.value?.split(' ')[0].slice(0, 7) ?? 'REG'}</text>
         </>
       )
@@ -151,7 +151,7 @@ export function MultiBody({ p }: { p: Look }) {
     case 'RGB':
       return (
         <>
-          <circle r={13} fill="#f1f3f5" fillOpacity={0.9} stroke="#000" strokeOpacity={0.35} />
+          <circle r={13} fill={p.color} fillOpacity={0.9} stroke="#000" strokeOpacity={0.35} />
           <circle cx={-6} cy={0} r={3.3} fill="#ff4d4d" /><circle cx={0} cy={-2} r={3.3} fill="#4cd964" /><circle cx={6} cy={0} r={3.3} fill="#4dabf7" />
         </>
       )

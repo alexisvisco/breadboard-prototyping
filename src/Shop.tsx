@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { BREAD_PRESETS, MCU_MODELS, type Extra } from './boards'
 import { BlockIcon, ExtraIcon, PartIcon } from './Box'
-import { BLOCKS, OHM_KINDS, SHOP, SHOP_CATS, formatOhms, parseOhms, resistorBands, type BlockId, type ShopItem } from './model'
+import { BLOCKS, OHM_KINDS, SHOP, WIRE_COLORS, SHOP_CATS, formatOhms, parseOhms, resistorBands, type BlockId, type ShopItem } from './model'
 
 interface Props {
   open: boolean
@@ -273,9 +273,12 @@ function ShopCard({ item, onAdd }: { item: ShopItem; onAdd: Props['onAdd'] }) {
         </div>
       )}
       {ohms && custom.trim() && !finalValue && <div className="text-xs text-red-300">Valeur pas comprise (ex. 220, 4.7k, 1M)</div>}
-      {item.colors && (
+      {(
         <div className="flex flex-wrap gap-1.5">
-          {item.colors.map((c) => (
+          <button title="Couleur d’origine" onClick={() => setColor(item.color)} className={`h-6 rounded-full border-2 px-2 text-[10px] ${color === item.color ? 'border-emerald-300' : 'border-white/15'}`} style={{ background: item.color, color: '#111' }}>
+            {item.colors ? '' : 'normal'}
+          </button>
+          {(item.colors ?? WIRE_COLORS).filter((c) => c.hex !== item.color).map((c) => (
             <button
               key={c.hex}
               title={c.name}
