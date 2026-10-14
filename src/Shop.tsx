@@ -18,12 +18,28 @@ interface Props {
 type Tab = 'parts' | 'boards' | 'cards'
 const TABS: [Tab, string][] = [['parts', 'Composants'], ['boards', 'Planches'], ['cards', 'Cartes']]
 
+const norm = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 const addBtn = 'rounded-md bg-emerald-500/90 px-3 py-1.5 text-sm font-semibold text-[#0d1512] hover:bg-emerald-400 disabled:bg-white/10 disabled:text-white/40'
 const field = 'rounded-md border border-white/15 bg-transparent px-2 py-1 text-sm outline-none focus:border-emerald-400/60'
 
 export function Shop({ open, owned, onClose, onAdd, onAddBlock, onAddExtra }: Props) {
   const [tab, setTab] = useState<Tab>('parts')
+  const [q, setQ] = useState('')
   if (!open) return null
+  // Une recherche parcourt tous les rayons à la fois.
+  const words = norm(q).split(/\s+/).filter(Boolean)
+  const searching = words.length > 0
+  const hit = (...texts: (string | undefined)[]) => {
+    const t = norm(texts.filter(Boolean).join(' '))
+    return words.every((w) => t.includes(w))
+  }
+  const shown = (t: Tab) => (searching ? true : tab === t)
+  const parts = SHOP.filter((it) => !searching || hit(it.title, it.desc, it.kind, it.cat, ...(it.values ?? []), ...(it.colors?.map((c) => c.name) ?? [])))
+  const blocks = (['card', 'jack'] as const).filter((b) => !searching || hit(BLOCKS[b].title, BLOCKS[b].desc))
+  const mcus = Object.entries(MCU_MODELS).filter(([k, m]) => !searching || hit(k, m.title, m.desc, m.module, m.note))
+  const showBread = !searching || hit('breadboard platine essai planche colonnes rails')
+  const showPerf = !searching || hit('plaque perforée perfboard stripboard bandes planche pastilles')
+  const none = searching && !parts.length && !blocks.length && !mcus.length && !showBread && !showPerf
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/55 py-[6vh]" onPointerDown={onClose}>
       <div className="w-[min(920px,94vw)] rounded-xl border border-white/15 bg-[#18211d] shadow-2xl" onPointerDown={(e) => e.stopPropagation()}>
@@ -34,35 +50,48 @@ export function Shop({ open, owned, onClose, onAdd, onAddBlock, onAddExtra }: Pr
           </div>
           <button onClick={onClose} className="rounded-md px-3 py-1.5 text-sm hover:bg-white/10">Fermer · Échap</button>
         </div>
-        <div className="flex gap-1 border-b border-white/10 px-5 pt-2">
-          {TABS.map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm ${tab === t ? 'border-b-2 border-emerald-400 text-white' : 'text-white/50 hover:text-white/80'}`}>
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 border-b border-white/10 px-5 pt-2">
+          <div className="flex gap-1">
+            {TABS.map(([t, label]) => (
+              <button key={t} onClick={() => { setTab(t); setQ('') }} className={`px-4 py-2 text-sm ${!searching && tab === t ? 'border-b-2 border-emerald-400 text-white' : 'text-white/50 hover:text-white/80'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Rechercher : transistor, 10k, ESP32, perfboard…"
+            className="mb-1.5 ml-auto w-72 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-sm outline-none placeholder:text-white/35 focus:border-emerald-400/60"
+          />
         </div>
 
-        {tab === 'parts' &&
-          SHOP_CATS.map((cat) => (
-            <div key={cat} className="p-5 pb-0 last:pb-5">
-              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">{cat}</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {SHOP.filter((it) => it.cat === cat).map((it) => <ShopCard key={it.title} item={it} onAdd={onAdd} />)}
-              </div>
-            </div>
-          ))}
+        {none && <p className="p-5 text-sm text-white/50">Rien ne correspond à « {q} ».</p>}
 
-        {tab === 'boards' && (
+        {shown('parts') &&
+          SHOP_CATS.map((cat) =>
+            parts.some((it) => it.cat === cat) ? (
+              <div key={cat} className="p-5 pb-0 last:pb-5">
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">{cat}</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {parts.filter((it) => it.cat === cat).map((it) => <ShopCard key={it.title} item={it} onAdd={onAdd} />)}
+                </div>
+              </div>
+            ) : null,
+          )}
+
+        {shown('boards') && (showBread || showPerf) && (
           <div className="grid gap-3 p-5">
-            <BreadForm onAdd={onAddExtra} />
-            <PerfForm onAdd={onAddExtra} />
+            {showBread && <BreadForm onAdd={onAddExtra} />}
+            {showPerf && <PerfForm onAdd={onAddExtra} />}
           </div>
         )}
 
-        {tab === 'cards' && (
+        {shown('cards') && (blocks.length > 0 || mcus.length > 0) && (
           <div className="p-5">
             <div className="grid gap-3 sm:grid-cols-2">
-              {(['card', 'jack'] as const).map((b) => (
+              {blocks.map((b) => (
                 <Row key={b} icon={<BlockIcon id={b} />} title={BLOCKS[b].title} desc={BLOCKS[b].desc}>
                   <button disabled={owned.includes(b)} onClick={() => onAddBlock(b)} className={addBtn}>{owned.includes(b) ? 'Dans la boîte' : 'Ajouter'}</button>
                 </Row>
@@ -70,7 +99,7 @@ export function Shop({ open, owned, onClose, onAdd, onAddBlock, onAddExtra }: Pr
             </div>
             <h3 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-white/45">Cartes de développement</h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              {Object.entries(MCU_MODELS).map(([model, m]) => (
+              {mcus.map(([model, m]) => (
                 <Row key={model} icon={<ExtraIcon kind="mcu" color={m.color} />} title={m.title} desc={`${m.desc}${m.note ? ` — ${m.note}` : ''}`}>
                   <button onClick={() => onAddExtra({ kind: 'mcu', title: m.title.replace(/ \(.*\)$/, ''), model })} className={addBtn}>Ajouter</button>
                 </Row>
