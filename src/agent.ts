@@ -51,6 +51,7 @@ Mets dans "a" et "b" les trous où vont ses deux pattes, ex. "a": "e25", "b": "e
 - CE (chimique) et LED : "a" = patte + (longue). D (diode) : "a" = anode, "b" = cathode (côté bague).
 - Les deux pattes d'une pièce doivent être dans deux groupes de trous différents, sinon elle est court-circuitée.
 - Pièces à 3 ou 4 pattes (POT, NPN, PNP, NMOS, REG, SERVO, RGB, SONAR) : "a", "b", "c" (et "d") dans l'ordre des noms ci-dessus ; les pattes se posent côte à côte (ex. "a": "e25", "b": "e24", "c": "e23"), dans trois colonnes différentes. Toutes posées, ou aucune.
+  SEG4 (afficheur 4 chiffres) : 12 pattes "a" à "l" ; a–f (broches 1 à 6) sur la rangée f, g–l (broches 12 à 7) sur la rangée e, aux mêmes colonnes (a et g dans la même colonne, b et h dans la suivante…).
 - W (fil Dupont) : "a" et "b" = un trou ou une broche de la carte. "b": null = bout libre.
   Ancrages (facultatif) : "via": [ {"dx": 120, "dy": 0, "kind": "corner"}, {"dx": 200, "dy": 100, "kind": "curve"} ] = le fil part de "a", passe par ces points dans l'ordre, puis arrive à "b".
   Chaque point est en pixels PAR RAPPORT AU BOUT "a" (dx vers la droite, dy vers le bas ; un trou = 24 px).
@@ -209,10 +210,7 @@ export function parseImport(text: string, current: Session): ImportResult {
       a: at.a ?? (kind === 'W' ? (at.b ?? null) : null),
       b: kind === 'W' && !at.a ? null : (at.b ?? null),
     }
-    if (legs.length > 2) {
-      part.c = at.c ?? null
-      if (legs.length > 3) part.d = at.d ?? null
-    }
+    for (const l of legs.slice(2)) part[l] = at[l] ?? null
     parts.push(part)
   })
 

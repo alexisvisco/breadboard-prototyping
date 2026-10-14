@@ -155,6 +155,19 @@ export function MultiBody({ p }: { p: Look }) {
           <circle cx={-6} cy={0} r={3.3} fill="#ff4d4d" /><circle cx={0} cy={-2} r={3.3} fill="#4cd964" /><circle cx={6} cy={0} r={3.3} fill="#4dabf7" />
         </>
       )
+    case 'SEG4':
+      return (
+        <>
+          <rect x={-72} y={-44} width={144} height={88} rx={4} fill={p.color} stroke="#000" />
+          {[0, 1, 2, 3].map((d) => (
+            <g key={d} transform={`translate(${-54 + d * 36},0)`} fill="#5a1414">
+              <rect x={-9} y={-32} width={18} height={4} rx={2} /><rect x={-9} y={-2} width={18} height={4} rx={2} /><rect x={-9} y={28} width={18} height={4} rx={2} />
+              <rect x={-14} y={-28} width={4} height={26} rx={2} /><rect x={10} y={-28} width={4} height={26} rx={2} />
+              <rect x={-14} y={2} width={4} height={26} rx={2} /><rect x={10} y={2} width={4} height={26} rx={2} />
+            </g>
+          ))}
+        </>
+      )
     case 'SONAR':
       return (
         <>

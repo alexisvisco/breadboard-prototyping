@@ -128,6 +128,14 @@ export const neighbourHole = (id: string): string => holeStep(id, 3) ?? holeStep
 
 /** Trous où poser les `n` pattes d'une pièce lâchée sur `id` : écartées de 3 pas (2 pattes) ou côte à côte (3 pattes ou plus). */
 export function legHoles(id: string, n: number): string[] {
+  // Afficheur 4 chiffres : 6 pattes sur la rangée f (broches 1 à 6), 6 sur la rangée e (broches 12 à 7), mêmes colonnes.
+  if (n === 12) {
+    const m = /^[a-j](\d+)$/.exec(id)
+    if (m) {
+      const col = Math.max(Number(m[1]), 6)
+      return [...Array.from({ length: 6 }, (_, i) => `f${col - i}`), ...Array.from({ length: 6 }, (_, i) => `e${col - i}`)]
+    }
+  }
   if (n <= 2) return [id, neighbourHole(id)]
   const right = holeStep(id, n - 1) !== null
   return Array.from({ length: n }, (_, i) => (right ? holeStep(id, i) : holeStep(id, -i)) ?? id)

@@ -567,10 +567,12 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
             })
             const first = pts[0]
             const last = pts[pts.length - 1]
-            const ang = Math.atan2(last.y - first.y, last.x - first.x)
+            const seg = p.kind === 'SEG4'
+            const ang = seg ? Math.atan2(pts[5].y - first.y, pts[5].x - first.x) : Math.atan2(last.y - first.y, last.x - first.x)
             const cx = pts.reduce((t, q) => t + q.x, 0) / pts.length
             const cy = pts.reduce((t, q) => t + q.y, 0) / pts.length
-            const O = { x: cx + Math.sin(ang) * MULTI_LIFT, y: cy - Math.cos(ang) * MULTI_LIFT }
+            const lift = seg ? 0 : MULTI_LIFT
+            const O = { x: cx + Math.sin(ang) * lift, y: cy - Math.cos(ang) * lift }
             const local = pts.map((q) => {
               const dx = q.x - O.x
               const dy = q.y - O.y
@@ -586,11 +588,11 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
                   </>
                 )}
                 <g transform={`translate(${O.x},${O.y}) rotate(${(ang * 180) / Math.PI})`}>
-                  {local.map((q, i) => <line key={i} x1={q.x} y1={q.y} x2={Math.max(-12, Math.min(12, q.x))} y2={10} stroke="#8a9096" strokeWidth={3} />)}
+                  {!seg && local.map((q, i) => <line key={i} x1={q.x} y1={q.y} x2={Math.max(-12, Math.min(12, q.x))} y2={10} stroke="#8a9096" strokeWidth={3} />)}
                   <MultiBody p={p} />
                 </g>
-                <text x={O.x} y={O.y - 26} fontSize={12} fontWeight={700} textAnchor="middle" fill="#14201c" stroke="#f3f1ea" strokeWidth={4} paintOrder="stroke">{p.label}</text>
-                {pts.map((q, i) => short[i] && <text key={i} x={q.x} y={q.y + 22} fontSize={10} fontWeight={700} textAnchor="middle" fill="#ffd43b" stroke="#14201c" strokeWidth={3} paintOrder="stroke" pointerEvents="none">{short[i]}</text>)}
+                <text x={O.x} y={O.y - (seg ? 50 : 26)} fontSize={12} fontWeight={700} textAnchor="middle" fill="#14201c" stroke="#f3f1ea" strokeWidth={4} paintOrder="stroke">{p.label}</text>
+                {pts.map((q, i) => short[i] && <text key={i} x={q.x} y={q.y + (seg ? (i < 6 ? 20 : -12) : 22)} fontSize={10} fontWeight={700} textAnchor="middle" fill="#ffd43b" stroke="#14201c" strokeWidth={3} paintOrder="stroke" pointerEvents="none">{short[i]}</text>)}
                 {legs.map((l, i) => (
                   <circle key={l} data-handle={`${p.id}|${l}`} cx={pts[i].x} cy={pts[i].y} r={8} fill="#fff" stroke="#14201c" strokeWidth={2.5} style={{ cursor: 'move' }} />
                 ))}

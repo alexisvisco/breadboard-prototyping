@@ -80,7 +80,7 @@ const GROUPS: { title: string; kinds: Kind[] }[] = [
   { title: 'Condensateurs et bobines', kinds: ['CE', 'CC', 'IND'] },
   { title: 'LED et diodes', kinds: ['LED', 'RGB', 'D'] },
   { title: 'Transistors et régulateurs', kinds: ['NPN', 'PNP', 'NMOS', 'REG'] },
-  { title: 'Boutons, sorties et capteurs', kinds: ['BTN', 'SW', 'BZ', 'MOT', 'SERVO', 'SONAR'] },
+  { title: 'Boutons, sorties et capteurs', kinds: ['BTN', 'SW', 'BZ', 'MOT', 'SERVO', 'SONAR', 'SEG4'] },
   { title: 'Piles', kinds: ['BAT'] },
   { title: 'Fils Dupont', kinds: ['W'] },
   { title: 'Fils du câble jack', kinds: ['L'] },

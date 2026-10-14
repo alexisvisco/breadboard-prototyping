@@ -157,7 +157,7 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
             )}
           </>
         )}
-        {legCount(p.kind) > 2 && p.a && (
+        {legCount(p.kind) > 2 && legCount(p.kind) < 5 && p.a && (
           <button className={item} onClick={act(() => setPart(p.id, legCount(p.kind) === 3 ? { a: p.c ?? null, c: p.a } : { a: p.d ?? null, d: p.a, b: p.c ?? null, c: p.b }))}><ArrowLeftRight className={ic} /> Retourner (première ↔ dernière patte)</button>
         )}
         <div className="my-1 border-t border-white/10" />
