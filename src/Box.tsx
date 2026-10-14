@@ -33,7 +33,7 @@ export function PartIcon({ kind, value, color }: { kind: Kind; value?: string; c
   )
 }
 
-export function ExtraIcon({ kind, color = '#d7192f' }: { kind: Extra['kind']; color?: string }) {
+export function ExtraIcon({ kind, color }: { kind: Extra['kind']; color?: string }) {
   if (kind === 'bread')
     return (
       <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
@@ -45,21 +45,21 @@ export function ExtraIcon({ kind, color = '#d7192f' }: { kind: Extra['kind']; co
   if (kind === 'mcu')
     return (
       <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
-        <rect x={16} y={1} width={32} height={22} rx={3} fill={color} />
+        <rect x={16} y={1} width={32} height={22} rx={3} fill={color ?? '#d7192f'} />
         <rect x={25} y={3} width={14} height={9} fill="#c9ccd1" />
         {[0, 1, 2, 3, 4].flatMap((i) => [19, 45].map((x) => <circle key={`${i}-${x}`} cx={x} cy={4 + i * 4} r={1.3} fill="#d9b44a" />))}
       </svg>
     )
   return (
     <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
-      <rect x={10} y={2} width={44} height={20} rx={2} fill={kind === 'strip' ? '#b98b4d' : '#3f7a4a'} />
+      <rect x={10} y={2} width={44} height={20} rx={2} fill={color ?? (kind === 'strip' ? '#b98b4d' : '#3f7a4a')} />
       {[0, 1, 2, 3, 4, 5, 6, 7].flatMap((i) => [7, 12, 17].map((y) => <circle key={`${i}-${y}`} cx={15 + i * 5} cy={y} r={1.5} fill="#d9b44a" />))}
     </svg>
   )
 }
 
 export function BlockIcon({ id, extra }: { id: BlockId; extra?: Extra }) {
-  if (extra) return <ExtraIcon kind={extra.kind} />
+  if (extra) return <ExtraIcon kind={extra.kind} color={extra.kind === 'mcu' ? undefined : extra.color} />
   return id === 'card' ? (
     <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
       <rect x={18} y={1} width={28} height={22} rx={3} fill="#d7192f" />

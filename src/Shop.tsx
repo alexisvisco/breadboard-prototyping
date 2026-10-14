@@ -2,9 +2,9 @@
 // Trois rayons : composants, planches (breadboards et plaques perforées sur mesure), cartes (ESP et autres).
 
 import { useState } from 'react'
-import { BREAD_PRESETS, MCU_MODELS, type Extra } from './boards'
+import { BREAD_PRESETS, MCU_MODELS, PCB_COLORS, type Extra } from './boards'
 import { BlockIcon, ExtraIcon, PartIcon } from './Box'
-import { BLOCKS, OHM_KINDS, SHOP, WIRE_COLORS, SHOP_CATS, formatOhms, parseOhms, resistorBands, type BlockId, type ShopItem } from './model'
+import { BLOCKS, OHM_KINDS, SHOP, SHOP_CATS, formatOhms, parseOhms, resistorBands, type BlockId, type ShopItem } from './model'
 
 interface Props {
   open: boolean
@@ -181,14 +181,16 @@ function PerfForm({ onAdd }: { onAdd: Props['onAddExtra'] }) {
   const [rows, setRows] = useState('14')
   const [strip, setStrip] = useState(false)
   const [title, setTitle] = useState('')
+  const [color, setColor] = useState<string | undefined>(undefined)
   const c = num(cols, 3, 60, 20)
   const r = num(rows, 3, 60, 14)
   const kind = strip ? 'strip' : 'perf'
+  const shade = color ?? (strip ? '#b98b4d' : '#3f7a4a')
   const name = strip ? 'Stripboard' : 'Plaque perforée'
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
       <div className="flex items-center gap-3">
-        <ExtraIcon kind={kind} />
+        <ExtraIcon kind={kind} color={shade} />
         <div>
           <div className="text-sm font-medium">Plaque perforée (perfboard)</div>
           <div className="text-xs text-white/50">Chaque pastille est isolée : tu relies avec des fils (ponts de soudure). Stripboard : chaque ligne est une bande de cuivre.</div>
@@ -196,7 +198,7 @@ function PerfForm({ onAdd }: { onAdd: Props['onAddExtra'] }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {PERF_PRESETS.map((p) => (
-          <button key={p.label} onClick={() => onAdd({ kind, title: `${name} ${p.label}`, cols: p.cols, rows: p.rows })} className="rounded-full border border-white/15 px-3 py-1 text-xs hover:bg-white/10">
+          <button key={p.label} onClick={() => onAdd({ kind, title: `${name} ${p.label}`, cols: p.cols, rows: p.rows, color })} className="rounded-full border border-white/15 px-3 py-1 text-xs hover:bg-white/10">
             + {p.label} ({p.cols} × {p.rows})
           </button>
         ))}
@@ -212,10 +214,17 @@ function PerfForm({ onAdd }: { onAdd: Props['onAddExtra'] }) {
         <label className="flex items-center gap-2 pb-1.5 text-xs text-white/70">
           <input type="checkbox" checked={strip} onChange={(e) => setStrip(e.target.checked)} /> bandes (stripboard)
         </label>
+        <div className="grid gap-1 text-xs text-white/55">Couleur
+          <div className="flex gap-1.5 pb-0.5">
+            {PCB_COLORS.map((p) => (
+              <button key={p.hex} title={p.name} onClick={() => setColor(p.hex)} className={`h-6 w-6 rounded-full border-2 ${shade === p.hex ? 'border-emerald-300' : 'border-white/15'}`} style={{ background: p.hex }} />
+            ))}
+          </div>
+        </div>
         <label className="grid gap-1 text-xs text-white/55">Nom (facultatif)
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${name} ${c} × ${r}`} className={`${field} w-44`} />
         </label>
-        <button onClick={() => onAdd({ kind, title: title.trim() || `${name} ${c} × ${r}`, cols: c, rows: r })} className={addBtn}>Ajouter</button>
+        <button onClick={() => onAdd({ kind, title: title.trim() || `${name} ${c} × ${r}`, cols: c, rows: r, color })} className={addBtn}>Ajouter</button>
       </div>
     </div>
   )
@@ -273,12 +282,9 @@ function ShopCard({ item, onAdd }: { item: ShopItem; onAdd: Props['onAdd'] }) {
         </div>
       )}
       {ohms && custom.trim() && !finalValue && <div className="text-xs text-red-300">Valeur pas comprise (ex. 220, 4.7k, 1M)</div>}
-      {(
+      {item.colors && (
         <div className="flex flex-wrap gap-1.5">
-          <button title="Couleur d’origine" onClick={() => setColor(item.color)} className={`h-6 rounded-full border-2 px-2 text-[10px] ${color === item.color ? 'border-emerald-300' : 'border-white/15'}`} style={{ background: item.color, color: '#111' }}>
-            {item.colors ? '' : 'normal'}
-          </button>
-          {(item.colors ?? WIRE_COLORS).filter((c) => c.hex !== item.color).map((c) => (
+          {item.colors.map((c) => (
             <button
               key={c.hex}
               title={c.name}

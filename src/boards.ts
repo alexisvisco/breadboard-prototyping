@@ -18,7 +18,18 @@ export interface Extra {
   rails?: boolean
   /** mcu : clé de MCU_MODELS. */
   model?: string
+  /** perf / strip : couleur du circuit imprimé. */
+  color?: string
 }
+
+/** Couleurs courantes de plaques perforées. */
+export const PCB_COLORS = [
+  { name: 'vert', hex: '#3f7a4a' },
+  { name: 'rouge', hex: '#b3342f' },
+  { name: 'bleu', hex: '#2a5a9a' },
+  { name: 'noir', hex: '#2a2d31' },
+  { name: 'beige', hex: '#b98b4d' },
+]
 
 export type PinRole = 'gnd' | '3v3' | '5v' | 'io' | 'other'
 

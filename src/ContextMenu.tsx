@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { ask, tell } from './dialog'
+import { PCB_COLORS } from './boards'
 import {
   addExtra, addToBox, HAS_VALUE, LED_COLORS, OHM_KINDS, POLAR, WIRE_COLORS, blockInfo, formatOhms, legCount, parseOhms, partName, removeBlock, unplaceBlock,
   type NodeId, type Part, type Session,
@@ -62,6 +63,19 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
     body = (
       <>
         <div className="px-2.5 py-1 text-xs font-semibold text-white/50">{blockInfo(session, id).title}</div>
+        {extra && (extra.kind === 'perf' || extra.kind === 'strip') && (
+          <div className="flex flex-wrap gap-1.5 px-2.5 py-1.5">
+            {PCB_COLORS.map((c) => (
+              <button
+                key={c.hex}
+                title={c.name}
+                onClick={act(() => update((s) => ({ ...s, extras: s.extras?.map((x) => (x.id === extra.id ? { ...x, color: c.hex } : x)) })))}
+                className={`h-6 w-6 rounded-full border-2 ${(extra.color ?? (extra.kind === 'strip' ? '#b98b4d' : '#3f7a4a')) === c.hex ? 'border-emerald-300' : 'border-white/20'}`}
+                style={{ background: c.hex }}
+              />
+            ))}
+          </div>
+        )}
         {extra && <button className={item} onClick={act(() => update((s) => addExtra(s, extra)))}>+ Ajouter 1 pareille à la boîte</button>}
         <button className={item} onClick={act(() => update((s) => rotateNode(s, id, 90)))}>↻ Pivoter de 90° <kbd className="float-right text-white/35">R</kbd></button>
         <button className={item} onClick={act(() => update((s) => rotateNode(s, id, -90)))}>↺ Pivoter dans l'autre sens</button>
@@ -77,7 +91,8 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
   } else {
     const p = session.parts.find((q) => q.id === target)
     if (!p) return null
-    const colors = p.kind === 'LED' ? LED_COLORS : WIRE_COLORS
+    // Seuls les fils et les LED ont une couleur à choisir ; une résistance, un transistor… ont leur look.
+    const colors = p.kind === 'LED' ? LED_COLORS : p.kind === 'W' || p.kind === 'L' ? WIRE_COLORS : null
     const editValue = async () => {
       const v = await ask(`Valeur de ${p.label}`, p.value ?? '', OHM_KINDS.includes(p.kind) ? 'Ex. 220, 4.7k, 10 kΩ, 1M' : undefined)
       if (v === null) return

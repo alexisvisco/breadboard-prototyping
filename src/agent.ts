@@ -66,7 +66,7 @@ Mets dans "a" et "b" les trous où vont ses deux pattes, ex. "a": "e25", "b": "e
 ## Planches supplémentaires ("extras")
 Le magasin permet d'ajouter d'autres planches. Chacune est un objet de "session.extras", posée comme un bloc ("nodes.<id>" = { x, y, rot }) et listée dans "blocks".
   { "id": "bread1", "kind": "bread", "title": "Breadboard 400", "cols": 30, "rails": true }
-  { "id": "perf1", "kind": "perf", "title": "Plaque 5×7", "cols": 18, "rows": 24 }
+  { "id": "perf1", "kind": "perf", "title": "Plaque 5×7", "cols": 18, "rows": 24, "color": "#b3342f" }   (color facultatif, plaques perforées seulement : vert #3f7a4a, rouge #b3342f, bleu #2a5a9a, noir #2a2d31, beige #b98b4d ; la breadboard est toujours blanche)
   { "id": "strip1", "kind": "strip", "title": "Stripboard", "cols": 20, "rows": 10 }
   { "id": "mcu1", "kind": "mcu", "title": "ESP32 DevKit", "model": "esp32-devkit" }
 Ne modifie pas une planche existante (taille, modèle) : ajoutes-en une nouvelle avec un nouvel "id" (bread2, perf2, mcu2…) si besoin.
@@ -161,7 +161,7 @@ export function parseImport(text: string, current: Session): ImportResult {
       if (!/^[a-z][a-z0-9]{1,20}$/i.test(id) || ['bb', 'card', 'jack'].includes(id)) out.errors.push(`Planche « ${id} » : identifiant invalide.`)
       else if (kind !== 'bread' && kind !== 'perf' && kind !== 'strip' && kind !== 'mcu') out.errors.push(`Planche « ${id} » : "kind" doit être bread, perf, strip ou mcu.`)
       else if (kind === 'mcu' && !MCU_MODELS[String(raw.model)]) out.errors.push(`Planche « ${id} » : modèle « ${String(raw.model)} » inconnu (${Object.keys(MCU_MODELS).join(', ')}).`)
-      else extras.push(cleanExtra({ id, kind, title: String(raw.title ?? id), cols: Number(raw.cols) || undefined, rows: Number(raw.rows) || undefined, rails: !!raw.rails, model: kind === 'mcu' ? String(raw.model) : undefined }))
+      else extras.push(cleanExtra({ id, kind, title: String(raw.title ?? id), color: (kind === 'perf' || kind === 'strip') && typeof raw.color === 'string' && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : undefined, cols: Number(raw.cols) || undefined, rows: Number(raw.rows) || undefined, rails: !!raw.rails, model: kind === 'mcu' ? String(raw.model) : undefined }))
     }
   }
   registerExtras(extras)

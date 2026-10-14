@@ -245,7 +245,7 @@ function PerfNode({ extra, hover, flash }: Hl & { extra: Extra }) {
   return (
     <g>
       <NodeTitle w={lay.w} title={extra.title} sub={`${g.cols} × ${g.rows}`} />
-      <rect data-drag="node" width={lay.w} height={lay.h} rx={10} fill={strip ? '#b98b4d' : '#3f7a4a'} stroke={strip ? '#8a6330' : '#2a5434'} strokeWidth={2} />
+      <rect data-drag="node" width={lay.w} height={lay.h} rx={10} fill={extra.color ?? (strip ? '#b98b4d' : '#3f7a4a')} stroke="#000" strokeOpacity={0.35} strokeWidth={2} />
       {strip &&
         Array.from({ length: g.rows }, (_, i) => i + 1).map((r) => (
           <rect key={r} x={10} y={g.rowY(r) - 8} width={lay.w - 20} height={16} rx={8} fill="#d9aa5e" opacity={0.85} />
