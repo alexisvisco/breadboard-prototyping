@@ -155,6 +155,14 @@ export function MultiBody({ p }: { p: Look }) {
           <circle cx={-6} cy={0} r={3.3} fill="#ff4d4d" /><circle cx={0} cy={-2} r={3.3} fill="#4cd964" /><circle cx={6} cy={0} r={3.3} fill="#4dabf7" />
         </>
       )
+    case 'LCD':
+      return (
+        <>
+          <rect x={-46} y={-20} width={92} height={36} rx={3} fill={p.color} stroke="#0d3d1c" />
+          <rect x={-40} y={-15} width={80} height={24} rx={1} fill="#2f7fd0" stroke="#10304f" />
+          {[0, 1].map((r) => Array.from({ length: 16 }, (_, c) => <rect key={`${r}${c}`} x={-38 + c * 4.9} y={-13 + r * 11.5} width={3.9} height={9.5} fill="#8fc2f2" fillOpacity={0.55} />))}
+        </>
+      )
     case 'SEG4':
       return (
         <>

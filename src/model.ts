@@ -16,7 +16,7 @@ import { EXTRA_PORT, MCU_MODELS, cleanExtra, extraDesc, extraOf, extraSize, layo
  */
 export type Kind =
   | 'R' | 'CE' | 'CC' | 'LED' | 'D' | 'BTN' | 'W' | 'L'
-  | 'SW' | 'LDR' | 'NTC' | 'BZ' | 'IND' | 'MOT' | 'BAT' | 'POT' | 'NPN' | 'PNP' | 'NMOS' | 'REG' | 'SERVO' | 'RGB' | 'SONAR' | 'SEG4'
+  | 'SW' | 'LDR' | 'NTC' | 'BZ' | 'IND' | 'MOT' | 'BAT' | 'POT' | 'NPN' | 'PNP' | 'NMOS' | 'REG' | 'SERVO' | 'RGB' | 'SONAR' | 'SEG4' | 'LCD'
 /** Un bloc de la boîte : 'card', 'jack', ou l'identifiant d'une planche supplémentaire (« bread1 », « perf1 », « mcu1 »). */
 export type BlockId = string
 export type NodeId = string
@@ -29,12 +29,14 @@ export const LEG_NAMES: Partial<Record<Kind, string[]>> = {
   CE: ['+', '−'], LED: ['+', '−'], D: ['anode', 'cathode'], BZ: ['+', '−'], BAT: ['+', '−'],
   POT: ['1', 'curseur', '2'], NPN: ['B', 'C', 'E'], PNP: ['B', 'C', 'E'], NMOS: ['G', 'D', 'S'],
   REG: ['IN', 'GND', 'OUT'], SERVO: ['GND', '+5V', 'signal'], RGB: ['R', 'K', 'G', 'B'], SONAR: ['VCC', 'Trig', 'Echo', 'GND'],
+  LCD: ['GND', 'VCC', 'SDA', 'SCL'],
   SEG4: ['E', 'D', 'DP', 'C', 'G', 'chiffre 4', 'chiffre 1', 'A', 'F', 'chiffre 2', 'chiffre 3', 'B'],
 }
 /** Noms très courts des pattes, écrits sur le canevas. */
 export const LEG_SHORT: Partial<Record<Kind, string[]>> = {
   POT: ['1', 'C', '2'], NPN: ['B', 'C', 'E'], PNP: ['B', 'C', 'E'], NMOS: ['G', 'D', 'S'], REG: ['IN', 'G', 'OUT'],
   SERVO: ['GND', '5V', 'SIG'], RGB: ['R', 'K', 'G', 'B'], SONAR: ['VCC', 'TRG', 'ECH', 'GND'],
+  LCD: ['GND', 'VCC', 'SDA', 'SCL'],
   SEG4: ['E', 'D', 'DP', 'C', 'G', 'D4', 'D1', 'A', 'F', 'D2', 'D3', 'B'],
 }
 export const legCount = (k: Kind) => LEG_NAMES[k]?.length ?? 2
@@ -237,6 +239,7 @@ export const SHOP: ShopItem[] = [
   { cat: 'Entrées, sorties et capteurs', kind: 'BZ', title: 'Buzzer', desc: 'Patte longue = +. Actif : bip dès qu’on l’alimente. Passif : il faut un signal.', values: ['actif 5 V', 'passif'], color: '#1a1a1a' },
   { cat: 'Entrées, sorties et capteurs', kind: 'MOT', title: 'Moteur DC', desc: 'Petit moteur à courant continu. Pas de sens fixe (inverser = tourner à l’envers). Ne jamais le brancher direct sur une broche.', values: ['3–6 V'], color: '#9aa3ab' },
   { cat: 'Entrées, sorties et capteurs', kind: 'SERVO', title: 'Servomoteur', desc: '3 fils : GND (marron), +5 V (rouge), signal (orange).', values: ['SG90'], color: '#2d74da' },
+  { cat: 'Entrées, sorties et capteurs', kind: 'LCD', title: 'Écran LCD 1602 I2C (16×2)', desc: '4 pattes côte à côte : GND, VCC (5 V), SDA, SCL. Deux lignes de 16 caractères, pilotées en I2C (adresse 0x27 ou 0x3F). Sur un ESP32 : SDA = IO21, SCL = IO22.', values: ['Freenove FNK0079'], color: '#1f7a3a' },
   { cat: 'Entrées, sorties et capteurs', kind: 'SEG4', title: 'Afficheur 7 segments 4 chiffres (cathode commune)', desc: '12 pattes en deux rangées de 6, à cheval sur le canal. Rangée du bas (broches 1 à 6) : E, D, DP, C, G, chiffre 4. Rangée du haut (broches 12 à 7) : chiffre 1, A, F, chiffre 2, chiffre 3, B. Une résistance par segment ; un chiffre s’allume quand sa broche passe à GND.', values: ['5461AS'], color: '#1a1a1a' },
   { cat: 'Entrées, sorties et capteurs', kind: 'SONAR', title: 'Capteur ultrasons HC-SR04', desc: '4 pattes : VCC (5 V), Trig, Echo, GND. Echo sort en 5 V : abaisse-le avant une carte 3,3 V.', color: '#1f6fb5' },
 
@@ -246,7 +249,7 @@ export const SHOP: ShopItem[] = [
 
 const PREFIX: Record<Kind, string> = {
   R: 'R', CE: 'C', CC: 'C', LED: 'LED', D: 'D', BTN: 'BP', W: 'Fil ', L: '', SW: 'SW', LDR: 'LDR', NTC: 'NTC', BZ: 'BZ', IND: 'L', MOT: 'M', BAT: 'BAT',
-  POT: 'RV', NPN: 'Q', PNP: 'Q', NMOS: 'Q', REG: 'U', SERVO: 'SV', RGB: 'RGB', SONAR: 'US', SEG4: 'AFF',
+  POT: 'RV', NPN: 'Q', PNP: 'Q', NMOS: 'Q', REG: 'U', SERVO: 'SV', RGB: 'RGB', SONAR: 'US', SEG4: 'AFF', LCD: 'LCD',
 }
 
 /** Valeur tapée à la main : en ohms pour les pièces à résistance. */
