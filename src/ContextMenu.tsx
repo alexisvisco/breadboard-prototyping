@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { ask, tell } from './dialog'
 import {
-  HAS_VALUE, LED_COLORS, OHM_KINDS, POLAR, WIRE_COLORS, blockInfo, formatOhms, legCount, parseOhms, partName, removeBlock, unplaceBlock,
+  addExtra, addToBox, HAS_VALUE, LED_COLORS, OHM_KINDS, POLAR, WIRE_COLORS, blockInfo, formatOhms, legCount, parseOhms, partName, removeBlock, unplaceBlock,
   type NodeId, type Part, type Session,
 } from './model'
 
@@ -14,6 +14,7 @@ interface Props {
   y: number
   update: (fn: (s: Session) => Session) => void
   onClose: () => void
+  onShop: () => void
 }
 
 export const unplacePart = (p: Part): Part => (p.kind === 'L' ? { ...p, b: null } : { ...p, a: null, b: null, c: null, d: null })
@@ -22,7 +23,7 @@ export const rotateNode = (s: Session, id: NodeId, d: number): Session => {
   return pos ? { ...s, nodes: { ...s.nodes, [id]: { ...pos, rot: (((pos.rot + d) % 360) + 360) % 360 } } } : s
 }
 
-export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
+export function ContextMenu({ session, target, x, y, update, onClose, onShop }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const close = (e: Event) => {
@@ -45,11 +46,23 @@ export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
   const style = { left: Math.min(x, window.innerWidth - 250), top: Math.min(y, window.innerHeight - 320) }
 
   let body: React.ReactNode = null
-  if (target.startsWith('node:')) {
+  if (target === 'void') {
+    body = (
+      <>
+        <div className="px-2.5 py-1 text-xs font-semibold text-white/50">Nouveau</div>
+        <button className={item} onClick={act(onShop)}>🛒 Ouvrir le magasin…</button>
+        <button className={item} onClick={act(() => update((s) => addToBox(s, 'W', 1, undefined, WIRE_COLORS[0].hex)))}>+ Un fil Dupont dans la boîte</button>
+        <button className={item} onClick={act(() => update((s) => addToBox(s, 'R', 1, '220 Ω', '#e3cf9f')))}>+ Une résistance 220 Ω dans la boîte</button>
+        <button className={item} onClick={act(() => update((s) => addToBox(s, 'LED', 1, undefined, LED_COLORS[0].hex)))}>+ Une LED dans la boîte</button>
+      </>
+    )
+  } else if (target.startsWith('node:')) {
     const id = target.slice(5) as NodeId
+    const extra = session.extras?.find((e) => e.id === id)
     body = (
       <>
         <div className="px-2.5 py-1 text-xs font-semibold text-white/50">{blockInfo(session, id).title}</div>
+        {extra && <button className={item} onClick={act(() => update((s) => addExtra(s, extra)))}>+ Ajouter 1 pareille à la boîte</button>}
         <button className={item} onClick={act(() => update((s) => rotateNode(s, id, 90)))}>↻ Pivoter de 90° <kbd className="float-right text-white/35">R</kbd></button>
         <button className={item} onClick={act(() => update((s) => rotateNode(s, id, -90)))}>↺ Pivoter dans l'autre sens</button>
         {id !== 'bb' && (
@@ -64,7 +77,7 @@ export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
   } else {
     const p = session.parts.find((q) => q.id === target)
     if (!p) return null
-    const colors = p.kind === 'W' || p.kind === 'L' ? WIRE_COLORS : p.kind === 'LED' ? LED_COLORS : null
+    const colors = p.kind === 'LED' ? LED_COLORS : WIRE_COLORS
     const editValue = async () => {
       const v = await ask(`Valeur de ${p.label}`, p.value ?? '', OHM_KINDS.includes(p.kind) ? 'Ex. 220, 4.7k, 10 kΩ, 1M' : undefined)
       if (v === null) return
@@ -77,6 +90,9 @@ export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
     body = (
       <>
         <div className="px-2.5 py-1 text-xs font-semibold text-white/50">{partName(p)}</div>
+        {p.kind !== 'L' && (
+          <button className={item} onClick={act(() => update((s) => addToBox(s, p.kind as Exclude<Part['kind'], 'L'>, 1, p.value, p.color)))}>+ Ajouter 1 pareille à la boîte</button>
+        )}
         {colors && (
           <div className="flex flex-wrap gap-1.5 px-2.5 py-1.5">
             {colors.map((c) => (

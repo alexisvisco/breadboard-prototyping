@@ -227,6 +227,22 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
   const [layers, setLayers] = useState<Layer[]>([])
   const [importOpen, setImportOpen] = useState(false)
   const [versionsKey, setVersionsKey] = useState(0)
+  const [rightOpen, setRightOpen] = useState(() => {
+    try {
+      return localStorage.getItem('bb-right') !== '0'
+    } catch {
+      return true
+    }
+  })
+  const toggleRight = () =>
+    setRightOpen((o) => {
+      try {
+        localStorage.setItem('bb-right', o ? '0' : '1')
+      } catch {
+        // pas grave : le choix ne sera pas retenu
+      }
+      return !o
+    })
 
   // Calques d'annotation : relus toutes les 3 s (Claude peut en ajouter pendant qu'on regarde).
   useEffect(() => {
@@ -418,11 +434,14 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
           <button onClick={() => setImportOpen(true)} className="rounded-md bg-emerald-500/90 px-3 py-1.5 font-semibold text-[#0d1512] hover:bg-emerald-400">
             Importer un JSON
           </button>
+          <button onClick={toggleRight} title={rightOpen ? 'Masquer le panneau de droite' : 'Afficher le panneau de droite'} className={`rounded-md border border-white/10 px-2.5 py-1.5 hover:bg-white/10 ${rightOpen ? '' : 'text-emerald-300'}`}>
+            {rightOpen ? '⇥' : '⇤'} Panneau
+          </button>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-72 shrink-0 border-r border-white/10 bg-[#141c19]">
+        <aside className="w-72 shrink-0 overflow-hidden border-r border-white/10 bg-[#141c19]">
           <Box session={session} selected={selected} onShop={() => setShopOpen(true)} onLocate={locate} onRemovePart={removePart} onRemoveBlock={removeBlk} />
         </aside>
 
@@ -483,7 +502,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
           )}
         </main>
 
-        <aside className="flex w-[360px] shrink-0 flex-col border-l border-white/10 bg-[#141c19]">
+        <aside className={`${rightOpen ? 'flex' : 'hidden'} w-[360px] shrink-0 flex-col border-l border-white/10 bg-[#141c19]`}>
           <div className="flex border-b border-white/10 text-sm">
             {(['analyse', 'diff', 'versions'] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`flex-1 px-4 py-2.5 ${tab === t ? 'border-b-2 border-emerald-400 text-white' : 'text-white/50 hover:text-white/80'}`}>
@@ -539,7 +558,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
         </aside>
       </div>
 
-      {menu && <ContextMenu session={session} target={menu.target} x={menu.x} y={menu.y} update={update} onClose={closeMenu} />}
+      {menu && <ContextMenu session={session} target={menu.target} x={menu.x} y={menu.y} update={update} onClose={closeMenu} onShop={() => setShopOpen(true)} />}
       <Shop
         open={shopOpen}
         owned={session.blocks}

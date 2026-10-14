@@ -13,14 +13,14 @@ export function PartBody({ p }: { p: Look }) {
     case 'R':
       return (
         <>
-          <rect x={-21} y={-8} width={42} height={16} rx={7} fill="#e3cf9f" stroke="#c9b07a" />
+          <rect x={-21} y={-8} width={42} height={16} rx={7} fill={p.color} stroke="#000" strokeOpacity={0.2} />
           {resistorBands(p.value).map(([, c], i) => <rect key={i} x={-15 + i * 7 + (i === 3 ? 5 : 0)} y={-8} width={4} height={16} fill={c} />)}
         </>
       )
     case 'CE':
       return (
         <>
-          <rect x={-18} y={-12} width={36} height={24} rx={6} fill="#1f3a93" />
+          <rect x={-18} y={-12} width={36} height={24} rx={6} fill={p.color} />
           <rect x={10} y={-12} width={8} height={24} rx={3} fill="#c7d2fe" />
           <text x={11} y={4} fontSize={10} fontWeight={800} fill="#1f3a93">−</text>
         </>
@@ -28,7 +28,7 @@ export function PartBody({ p }: { p: Look }) {
     case 'CC':
       return (
         <>
-          <ellipse rx={13} ry={11} fill="#d9a441" stroke="#a7772a" />
+          <ellipse rx={13} ry={11} fill={p.color} stroke="#000" strokeOpacity={0.25} />
           <text y={3} fontSize={6} textAnchor="middle" fill="#3b2a0a">{p.value?.replace(/\s/g, '') ?? ''}</text>
         </>
       )
@@ -43,21 +43,21 @@ export function PartBody({ p }: { p: Look }) {
     case 'D':
       return (
         <>
-          <rect x={-16} y={-6} width={32} height={12} rx={3} fill="#2b2b2b" />
+          <rect x={-16} y={-6} width={32} height={12} rx={3} fill={p.color} />
           <rect x={9} y={-6} width={4} height={12} fill="#ced4da" />
         </>
       )
     case 'BTN':
       return (
         <>
-          <rect x={-14} y={-14} width={28} height={28} rx={3} fill="#3b3b3b" stroke="#111" />
+          <rect x={-14} y={-14} width={28} height={28} rx={3} fill={p.color} stroke="#111" />
           <circle r={8} fill="#1a1a1a" stroke="#555" />
         </>
       )
     case 'SW':
       return (
         <>
-          <rect x={-18} y={-9} width={36} height={18} rx={3} fill="#444b52" stroke="#1d2125" />
+          <rect x={-18} y={-9} width={36} height={18} rx={3} fill={p.color} stroke="#1d2125" />
           <rect x={-8} y={-5} width={16} height={10} rx={2} fill="#1a1d20" />
           <rect x={-8} y={-5} width={8} height={10} rx={2} fill="#cfd4d9" />
         </>

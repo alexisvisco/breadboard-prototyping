@@ -119,7 +119,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
           />
         )}
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+      <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 pb-4">
         {empty && (
           <div className="rounded-lg border border-dashed border-white/15 p-4 text-sm leading-relaxed text-white/55">
             Ta boîte est vide. Ouvre le <b className="text-white/80">magasin</b> et ajoute ce que tu as sous la main : résistances, condensateurs, fils, la carte…
@@ -132,7 +132,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
         {session.blocks.some((b) => match(blockInfo(session, b).title)) && (
           <section>
             <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/40">Blocs</h3>
-            <div className="grid gap-1.5">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
               {session.blocks.filter((b) => match(blockInfo(session, b).title)).map((b) => {
                 const on = !!session.nodes[b]
                 return (
@@ -166,7 +166,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
                 {g.title} <span className="font-normal text-white/30">· {items.filter(isPlaced).length}/{items.length} posés</span>
               </h3>
               {jackOff && <p className="mb-1.5 text-xs text-white/40">Pose le câble jack sur le canevas pour brancher ses fils.</p>}
-              <div className="grid gap-1.5">
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
                 {items.map((p) => {
                   const on = isPlaced(p)
                   // Les fils du jack se branchent depuis le canevas (ils partent du câble).

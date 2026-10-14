@@ -102,7 +102,7 @@ export function wireCurve(A: Pt, B: Pt, bend?: number) {
 }
 
 type Mode =
-  | { type: 'pan'; sx: number; sy: number; tx: number; ty: number; moved: boolean }
+  | { type: 'pan'; sx: number; sy: number; tx: number; ty: number; moved: boolean; mid?: boolean }
   | { type: 'node'; id: NodeId; dx: number; dy: number; sx: number; sy: number; moved: boolean }
   | { type: 'end'; partId: string; end: Leg; pins: boolean }
   | { type: 'bend'; partId: string }
@@ -220,6 +220,13 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     onChange((s) => ({ ...s, parts: s.parts.map((p) => (p.id === id ? { ...p, ...patch } : p)) }))
 
   function onPointerDown(e: React.PointerEvent) {
+    // Clic molette : on déplace la vue, quoi qu'il y ait sous le curseur (rien n'est touché ni sélectionné).
+    if (e.button === 1) {
+      e.preventDefault()
+      svgRef.current!.setPointerCapture(e.pointerId)
+      mode.current = { type: 'pan', sx: e.clientX, sy: e.clientY, tx: view.tx, ty: view.ty, moved: true, mid: true }
+      return
+    }
     if (e.button !== 0) return
     const t = e.target as Element
     // Bouton ↻ dans le titre d'un bloc.
@@ -305,7 +312,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       else if (part && (part.kind === 'L' || part.kind === 'W') && m.end === 'b') setPart(m.partId, { b: null })
     }
     if (m?.type === 'node' && !m.moved) setSelected(`node:${m.id}`)
-    if (m?.type === 'pan' && !m.moved) setSelected(null)
+    if (m?.type === 'pan' && !m.moved && !m.mid) setSelected(null)
     setDragPos(null)
     svgRef.current?.releasePointerCapture(e.pointerId)
   }
@@ -321,9 +328,8 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     const t = e.target as Element
     const part = t.closest('[data-part]')?.getAttribute('data-part')
     const node = t.closest('[data-node]')?.getAttribute('data-node')
-    const target = part ?? (node ? `node:${node}` : null)
-    if (!target) return
-    setSelected(target)
+    const target = part ?? (node ? `node:${node}` : 'void')
+    setSelected(target === 'void' ? null : target)
     onContext(target, e.clientX, e.clientY)
   }
 
@@ -372,6 +378,8 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       onPointerLeave={() => { setHover(null); onHover(null) }}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
+      onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+      onAuxClick={(e) => e.preventDefault()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
     >
