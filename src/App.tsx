@@ -476,7 +476,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
             <button className="px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.zoom(1.25)} title="Zoomer">＋</button>
           </div>
           <div className="pointer-events-none absolute bottom-4 left-1/2 max-w-[60%] -translate-x-1/2 truncate rounded-full bg-black/60 px-4 py-1.5 font-mono text-xs text-white/80">
-            {hoverText ?? 'Glisser le fond : se déplacer · ⌘ + molette : zoomer · clic droit : options'}
+            {hoverText ?? 'Glisser le fond ou clic molette : se déplacer · molette : zoomer · clic droit : options'}
           </div>
 
           {(sel || selNode) && (

@@ -196,20 +196,21 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     }
   }, [fit])
 
-  // Molette : pincer / Ctrl = zoom, sinon déplacement (comme Figma).
+  // Molette = zoom ; Maj + molette ou défilement horizontal = déplacement.
   useEffect(() => {
     const svg = svgRef.current!
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const v = viewRef.current
-      if (e.ctrlKey || e.metaKey) {
+      if (!e.shiftKey && !e.deltaX) {
         const r = svg.getBoundingClientRect()
-        const s = Math.min(4, Math.max(0.15, v.s * Math.exp(-e.deltaY * 0.01)))
+        // Pincement de trackpad (ctrlKey) : deltas fins ; molette de souris : deltas de ~100.
+        const s = Math.min(4, Math.max(0.15, v.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))))
         const cx = e.clientX - r.left
         const cy = e.clientY - r.top
         setView({ s, tx: cx - ((cx - v.tx) / v.s) * s, ty: cy - ((cy - v.ty) / v.s) * s })
       } else {
-        setView({ ...v, tx: v.tx - e.deltaX, ty: v.ty - e.deltaY })
+        setView({ ...v, tx: v.tx - (e.deltaX || e.deltaY), ty: v.ty - (e.deltaX ? e.deltaY : 0) })
       }
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
