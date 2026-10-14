@@ -101,11 +101,27 @@ export function wireCurve(A: Pt, B: Pt, bend?: number) {
   }
 }
 
+/** Ligne brisée passant par `pts`, avec des coins arrondis de rayon `r` (0 = angles vifs). */
+export function roundedPath(pts: Pt[], r: number): string {
+  const at = (q: Pt) => `${q.x},${q.y}`
+  if (pts.length < 3 || r <= 0) return `M${pts.map(at).join(' L')}`
+  let d = `M${at(pts[0])}`
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [p, c, n] = [pts[i - 1], pts[i], pts[i + 1]]
+    const l1 = Math.hypot(p.x - c.x, p.y - c.y) || 1
+    const l2 = Math.hypot(n.x - c.x, n.y - c.y) || 1
+    const k = Math.min(r, l1 / 2, l2 / 2)
+    d += ` L${c.x + ((p.x - c.x) / l1) * k},${c.y + ((p.y - c.y) / l1) * k} Q${at(c)} ${c.x + ((n.x - c.x) / l2) * k},${c.y + ((n.y - c.y) / l2) * k}`
+  }
+  return `${d} L${at(pts[pts.length - 1])}`
+}
+
 type Mode =
   | { type: 'pan'; sx: number; sy: number; tx: number; ty: number; moved: boolean; mid?: boolean }
   | { type: 'node'; id: NodeId; dx: number; dy: number; sx: number; sy: number; moved: boolean }
   | { type: 'end'; partId: string; end: Leg; pins: boolean }
   | { type: 'bend'; partId: string }
+  | { type: 'via'; partId: string; index: number }
 
 interface Props {
   session: Session
@@ -238,6 +254,30 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       return
     }
     svgRef.current!.setPointerCapture(e.pointerId)
+    const viaEl = t.closest('[data-via]')
+    if (viaEl) {
+      const [partId, i] = viaEl.getAttribute('data-via')!.split('|')
+      mode.current = { type: 'via', partId, index: Number(i) }
+      setSelected(partId)
+      return
+    }
+    // « + » au milieu d'un segment : on crée un coude à cet endroit et on le saisit.
+    const addEl = t.closest('[data-viaadd]')
+    if (addEl) {
+      const [partId, i] = addEl.getAttribute('data-viaadd')!.split('|')
+      const index = Number(i)
+      const w = toWorld(e.clientX, e.clientY)
+      const part = session.parts.find((p) => p.id === partId)
+      const A = part?.a ? portWorld(session, part.a) : null
+      if (part && A) {
+        const via = [...(part.via ?? [])]
+        via.splice(index, 0, { dx: Math.round(w.x - A.x), dy: Math.round(w.y - A.y) })
+        setPart(partId, { via })
+        mode.current = { type: 'via', partId, index }
+        setSelected(partId)
+      }
+      return
+    }
     const bendEl = t.closest('[data-bend]')
     if (bendEl) {
       const partId = bendEl.getAttribute('data-bend')!
@@ -289,6 +329,23 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       m.moved = m.moved || Math.abs(e.clientX - m.sx) + Math.abs(e.clientY - m.sy) > 3
       if (m.moved)
         onChange((s) => ({ ...s, nodes: { ...s.nodes, [m.id]: { ...s.nodes[m.id]!, x: Math.round(w.x - m.dx), y: Math.round(w.y - m.dy) } } }))
+    } else if (m.type === 'via') {
+      const part = session.parts.find((p) => p.id === m.partId)
+      const A = part?.a ? portWorld(session, part.a) : null
+      const B = part?.b ? portWorld(session, part.b) : null
+      if (!part || !A || !B || !part.via?.[m.index]) return
+      const abs = part.via.map((v) => ({ x: A.x + v.dx, y: A.y + v.dy }))
+      const prev = m.index === 0 ? A : abs[m.index - 1]
+      const next = m.index === abs.length - 1 ? B : abs[m.index + 1]
+      // Aimant : s'aligne sur les points voisins, pour faire des angles droits sans effort.
+      const snap = 10 / viewRef.current.s
+      let [x, y] = [w.x, w.y]
+      for (const q of [prev, next]) {
+        if (Math.abs(x - q.x) < snap) x = q.x
+        if (Math.abs(y - q.y) < snap) y = q.y
+      }
+      const via = part.via.map((v, i) => (i === m.index ? { dx: Math.round(x - A.x), dy: Math.round(y - A.y) } : v))
+      setPart(m.partId, { via })
     } else if (m.type === 'bend') {
       const part = session.parts.find((p) => p.id === m.partId)
       const A = part?.a ? portWorld(session, part.a) : null
@@ -320,6 +377,14 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
 
   // Double-clic sur la poignée de courbure : le fil reprend son pendant naturel.
   function onDoubleClick(e: React.MouseEvent) {
+    const via = (e.target as Element).closest('[data-via]')?.getAttribute('data-via')
+    if (via) {
+      const [partId, i] = via.split('|')
+      const part = session.parts.find((p) => p.id === partId)
+      const rest = (part?.via ?? []).filter((_, k) => k !== Number(i))
+      setPart(partId, { via: rest.length ? rest : undefined })
+      return
+    }
     const id = (e.target as Element).closest('[data-bend]')?.getAttribute('data-bend')
     if (id) setPart(id, { bend: undefined })
   }
@@ -513,7 +578,9 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
             )
           }
           const curve = wireCurve(A, B, p.kind === 'W' ? p.bend : undefined)
-          const wire = curve.d
+          // Coudes : le fil devient une ligne brisée a → coudes → b.
+          const rpts = p.kind === 'W' && p.b && p.via?.length ? [A, ...p.via.map((v) => ({ x: A.x + v.dx, y: A.y + v.dy })), B] : null
+          const wire = rpts ? roundedPath(rpts, p.round ?? 6) : curve.d
           const lA = p.kind === 'L' && lead ? nodeWorld(session, 'jack', { x: lead.x, y: lead.y + 50 })! : A
           const path = p.kind === 'L' ? `M${A.x},${A.y} C${lA.x},${lA.y} ${B.x},${B.y + 60} ${B.x},${B.y}` : wire
           const mx = (A.x + B.x) / 2
@@ -545,7 +612,21 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
                   <text x={mx} y={my - 18} fontSize={12} fontWeight={700} textAnchor="middle" fill="#14201c" stroke="#f3f1ea" strokeWidth={4} paintOrder="stroke">{p.label}</text>
                 </>
               )}
-              {p.kind === 'W' && isSel && p.b && !dragging && (
+              {rpts && isSel && !dragging && (
+                <>
+                  {rpts.slice(0, -1).map((q, i) => (
+                    <circle key={`add${i}`} data-viaadd={`${p.id}|${i}`} cx={(q.x + rpts[i + 1].x) / 2} cy={(q.y + rpts[i + 1].y) / 2} r={5} fill="#fff" fillOpacity={0.85} stroke="#14201c" strokeWidth={2} style={{ cursor: 'copy' }}>
+                      <title>Glisser pour ajouter un coude</title>
+                    </circle>
+                  ))}
+                  {rpts.slice(1, -1).map((q, i) => (
+                    <rect key={`via${i}`} data-via={`${p.id}|${i}`} x={q.x - 7} y={q.y - 7} width={14} height={14} transform={`rotate(45 ${q.x} ${q.y})`} fill="#ffd43b" stroke="#14201c" strokeWidth={2.5} style={{ cursor: 'move' }}>
+                      <title>Glisser pour déplacer le coude · double-clic : le retirer</title>
+                    </rect>
+                  ))}
+                </>
+              )}
+              {p.kind === 'W' && isSel && p.b && !dragging && !rpts && (
                 <g data-bend={p.id} style={{ cursor: 'grab' }}>
                   <title>Glisser pour courber le fil · double-clic : remettre droit</title>
                   <rect x={curve.mid.x - 7} y={curve.mid.y - 7} width={14} height={14} transform={`rotate(45 ${curve.mid.x} ${curve.mid.y})`} fill="#ffd43b" stroke="#14201c" strokeWidth={2.5} />

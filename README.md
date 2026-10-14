@@ -11,6 +11,7 @@ Recopier un montage électronique dans le navigateur, pour apprendre et diagnost
 - **Diff** : choisis une version, tout ce qui a changé depuis s'affiche d'un coup sur le canevas (vert ajouté, orange déplacé / modifié, rouge retiré) ; la version d'avant reste visible en transparence à son ancienne place.
 - **Versions** : instantanés nommés, comparaison (pièces ajoutées / déplacées / retirées et liaisons électriques gagnées / perdues), restauration.
 - **Fils courbes** : sélectionne un fil, glisse le losange jaune au milieu pour le courber (double-clic : retour au pendant naturel) ; clic droit → « Courber le fil ». Dans le JSON, `"bend"` (px, + = côté droit de a vers b) : Claude peut s'en servir pour éviter que les fils se croisent.
+- **Coudes** : sélectionne un fil, glisse un « + » (milieu d'un segment) pour créer un coude, glisse un losange jaune pour le déplacer (il s'aligne tout seul sur les points voisins : angles droits faciles), double-clic dessus pour le retirer. Clic droit → « Coude à 90° ». Dans le JSON : `"via": [{"dx", "dy"}]` (px depuis le bout `a`) et `"round"` (rayon des coins).
 - Clic droit sur une pièce ou un bloc : couleur des fils, valeur, sens, rotation (aussi touche `R`), ranger, supprimer.
 
 ## Travailler avec Claude

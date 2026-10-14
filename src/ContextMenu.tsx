@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { ask, tell } from './dialog'
 import { PCB_COLORS } from './boards'
+import { portWorld } from './Canvas'
 import {
   addExtra, addToBox, HAS_VALUE, LED_COLORS, OHM_KINDS, POLAR, WIRE_COLORS, blockInfo, formatOhms, legCount, parseOhms, partName, removeBlock, unplaceBlock,
   type NodeId, type Part, type Session,
@@ -39,6 +40,14 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
   }, [onClose])
 
   const setPart = (id: string, patch: Partial<Part>) => update((s) => ({ ...s, parts: s.parts.map((p) => (p.id === id ? { ...p, ...patch } : p)) }))
+  // Un seul coude à angle droit entre les deux bouts du fil.
+  const elbow = (p: Part, order: 'hv' | 'vh') => {
+    const A = p.a ? portWorld(session, p.a) : null
+    const B = p.b ? portWorld(session, p.b) : null
+    if (!A || !B) return
+    const via = order === 'hv' ? [{ dx: Math.round(B.x - A.x), dy: 0 }] : [{ dx: 0, dy: Math.round(B.y - A.y) }]
+    setPart(p.id, { via, bend: undefined })
+  }
   const act = (fn: () => void) => () => {
     fn()
     onClose()
@@ -132,6 +141,14 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
           <>
             <button className={item} onClick={act(() => setPart(p.id, { bend: Math.round((p.bend ?? 0) + 60) }))}>Courber le fil ↷ <span className="float-right text-white/35">+60</span></button>
             <button className={item} onClick={act(() => setPart(p.id, { bend: Math.round((p.bend ?? 0) - 60) }))}>Courber le fil ↶ <span className="float-right text-white/35">−60</span></button>
+            <button className={item} onClick={act(() => elbow(p, 'hv'))}>Coude à 90° (horizontal puis vertical)</button>
+            <button className={item} onClick={act(() => elbow(p, 'vh'))}>Coude à 90° (vertical puis horizontal)</button>
+            {p.via?.length ? (
+              <>
+                <button className={item} onClick={act(() => setPart(p.id, { round: p.round === 0 ? undefined : 0 }))}>{p.round === 0 ? 'Arrondir les coins' : 'Coins vifs'}</button>
+                <button className={item} onClick={act(() => setPart(p.id, { via: undefined, round: undefined }))}>Retirer les coudes</button>
+              </>
+            ) : null}
             {p.bend !== undefined && <button className={item} onClick={act(() => setPart(p.id, { bend: undefined }))}>Remettre le pendant naturel</button>}
           </>
         )}

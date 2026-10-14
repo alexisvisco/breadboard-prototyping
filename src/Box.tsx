@@ -106,7 +106,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, on
   const used = 'cursor-pointer border-transparent bg-transparent opacity-60 hover:opacity-100'
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full select-none flex-col">
       <div className="space-y-2 p-3">
         <button onClick={onShop} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500/90 px-3 py-2 text-sm font-semibold text-[#0d1512] hover:bg-emerald-400">
           <span>🛒</span> Magasin
@@ -116,7 +116,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, on
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Filtrer : 10k, C1, rouge…"
-            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none placeholder:text-white/40 focus:border-emerald-400/60"
+            className="w-full select-text rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none placeholder:text-white/40 focus:border-emerald-400/60"
           />
         )}
       </div>
