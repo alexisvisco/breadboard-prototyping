@@ -147,6 +147,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
   const viewRef = useRef(view)
   viewRef.current = view
   const mode = useRef<Mode | null>(null)
+  const lastTap = useRef<{ key: string; at: number } | null>(null)
   const [dragPos, setDragPos] = useState<Pt | null>(null)
   const [hover, setHover] = useState<string | null>(null)
 
@@ -254,6 +255,21 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       return
     }
     svgRef.current!.setPointerCapture(e.pointerId)
+    // Double-clic sur une poignée : détecté ici, car la capture du pointeur redirige les événements « click » vers le SVG.
+    const tapKey = t.closest('[data-via]')?.getAttribute('data-via') ?? t.closest('[data-bend]')?.getAttribute('data-bend') ?? null
+    const now = Date.now()
+    const twice = !!tapKey && lastTap.current?.key === tapKey && now - lastTap.current.at < 400
+    lastTap.current = tapKey ? { key: tapKey, at: now } : null
+    if (twice && tapKey) {
+      lastTap.current = null
+      mode.current = null
+      if (tapKey.includes('|')) {
+        const [partId, i] = tapKey.split('|')
+        const rest = (session.parts.find((p) => p.id === partId)?.via ?? []).filter((_, k) => k !== Number(i))
+        setPart(partId, { via: rest.length ? rest : undefined })
+      } else setPart(tapKey, { bend: undefined })
+      return
+    }
     const viaEl = t.closest('[data-via]')
     if (viaEl) {
       const [partId, i] = viaEl.getAttribute('data-via')!.split('|')
@@ -375,20 +391,6 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     svgRef.current?.releasePointerCapture(e.pointerId)
   }
 
-  // Double-clic sur la poignée de courbure : le fil reprend son pendant naturel.
-  function onDoubleClick(e: React.MouseEvent) {
-    const via = (e.target as Element).closest('[data-via]')?.getAttribute('data-via')
-    if (via) {
-      const [partId, i] = via.split('|')
-      const part = session.parts.find((p) => p.id === partId)
-      const rest = (part?.via ?? []).filter((_, k) => k !== Number(i))
-      setPart(partId, { via: rest.length ? rest : undefined })
-      return
-    }
-    const id = (e.target as Element).closest('[data-bend]')?.getAttribute('data-bend')
-    if (id) setPart(id, { bend: undefined })
-  }
-
   function onContextMenu(e: React.MouseEvent) {
     e.preventDefault()
     const t = e.target as Element
@@ -443,7 +445,6 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       onPointerCancel={() => { mode.current = null; setDragPos(null) }}
       onPointerLeave={() => { setHover(null); onHover(null) }}
       onContextMenu={onContextMenu}
-      onDoubleClick={onDoubleClick}
       onMouseDown={(e) => e.button === 1 && e.preventDefault()}
       onAuxClick={(e) => e.preventDefault()}
       onDragOver={(e) => e.preventDefault()}
