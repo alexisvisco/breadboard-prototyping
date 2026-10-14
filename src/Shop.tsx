@@ -1,8 +1,10 @@
 // Magasin : on choisit ce qu'on a chez soi, ça part dans la boîte de la session.
+// Trois rayons : composants, planches (breadboards et plaques perforées sur mesure), cartes (ESP et autres).
 
 import { useState } from 'react'
-import { BlockIcon, PartIcon } from './Box'
-import { BLOCKS, SHOP, formatOhms, parseOhms, resistorBands, type BlockId, type ShopItem } from './model'
+import { BREAD_PRESETS, MCU_MODELS, type Extra } from './boards'
+import { BlockIcon, ExtraIcon, PartIcon } from './Box'
+import { BLOCKS, OHM_KINDS, SHOP, SHOP_CATS, formatOhms, parseOhms, resistorBands, type BlockId, type ShopItem } from './model'
 
 interface Props {
   open: boolean
@@ -10,9 +12,17 @@ interface Props {
   onClose: () => void
   onAdd: (item: ShopItem, qty: number, value: string | undefined, color: string) => void
   onAddBlock: (b: BlockId) => void
+  onAddExtra: (spec: Omit<Extra, 'id'>) => void
 }
 
-export function Shop({ open, owned, onClose, onAdd, onAddBlock }: Props) {
+type Tab = 'parts' | 'boards' | 'cards'
+const TABS: [Tab, string][] = [['parts', 'Composants'], ['boards', 'Planches'], ['cards', 'Cartes']]
+
+const addBtn = 'rounded-md bg-emerald-500/90 px-3 py-1.5 text-sm font-semibold text-[#0d1512] hover:bg-emerald-400 disabled:bg-white/10 disabled:text-white/40'
+const field = 'rounded-md border border-white/15 bg-transparent px-2 py-1 text-sm outline-none focus:border-emerald-400/60'
+
+export function Shop({ open, owned, onClose, onAdd, onAddBlock, onAddExtra }: Props) {
+  const [tab, setTab] = useState<Tab>('parts')
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/55 py-[6vh]" onPointerDown={onClose}>
@@ -24,30 +34,159 @@ export function Shop({ open, owned, onClose, onAdd, onAddBlock }: Props) {
           </div>
           <button onClick={onClose} className="rounded-md px-3 py-1.5 text-sm hover:bg-white/10">Fermer · Échap</button>
         </div>
-        <div className="grid gap-3 p-5 sm:grid-cols-2">
-          {SHOP.map((it) => <ShopCard key={it.kind} item={it} onAdd={onAdd} />)}
+        <div className="flex gap-1 border-b border-white/10 px-5 pt-2">
+          {TABS.map(([t, label]) => (
+            <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm ${tab === t ? 'border-b-2 border-emerald-400 text-white' : 'text-white/50 hover:text-white/80'}`}>
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="border-t border-white/10 p-5">
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">Blocs</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(['card', 'jack'] as BlockId[]).map((b) => (
-              <div key={b} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                <BlockIcon id={b} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">{BLOCKS[b].title}</div>
-                  <div className="text-xs text-white/50">{BLOCKS[b].desc}</div>
-                </div>
-                <button
-                  disabled={owned.includes(b)}
-                  onClick={() => onAddBlock(b)}
-                  className="rounded-md bg-emerald-500/90 px-3 py-1.5 text-sm font-semibold text-[#0d1512] hover:bg-emerald-400 disabled:bg-white/10 disabled:text-white/40"
-                >
-                  {owned.includes(b) ? 'Dans la boîte' : 'Ajouter'}
-                </button>
+
+        {tab === 'parts' &&
+          SHOP_CATS.map((cat) => (
+            <div key={cat} className="p-5 pb-0 last:pb-5">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">{cat}</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {SHOP.filter((it) => it.cat === cat).map((it) => <ShopCard key={it.title} item={it} onAdd={onAdd} />)}
               </div>
-            ))}
+            </div>
+          ))}
+
+        {tab === 'boards' && (
+          <div className="grid gap-3 p-5">
+            <BreadForm onAdd={onAddExtra} />
+            <PerfForm onAdd={onAddExtra} />
           </div>
+        )}
+
+        {tab === 'cards' && (
+          <div className="p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(['card', 'jack'] as const).map((b) => (
+                <Row key={b} icon={<BlockIcon id={b} />} title={BLOCKS[b].title} desc={BLOCKS[b].desc}>
+                  <button disabled={owned.includes(b)} onClick={() => onAddBlock(b)} className={addBtn}>{owned.includes(b) ? 'Dans la boîte' : 'Ajouter'}</button>
+                </Row>
+              ))}
+            </div>
+            <h3 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-white/45">Cartes de développement</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Object.entries(MCU_MODELS).map(([model, m]) => (
+                <Row key={model} icon={<ExtraIcon kind="mcu" color={m.color} />} title={m.title} desc={`${m.desc}${m.note ? ` — ${m.note}` : ''}`}>
+                  <button onClick={() => onAddExtra({ kind: 'mcu', title: m.title.replace(/ \(.*\)$/, ''), model })} className={addBtn}>Ajouter</button>
+                </Row>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-white/40">Tu peux en ajouter plusieurs. Relie leurs broches avec des fils Dupont ; l’app vérifie les courts-circuits d’alimentation.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Row({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+      {icon}
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs leading-snug text-white/50">{desc}</div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+const num = (v: string, lo: number, hi: number, d: number) => {
+  const n = Math.round(Number(v))
+  return Number.isFinite(n) && n > 0 ? Math.min(hi, Math.max(lo, n)) : d
+}
+
+function BreadForm({ onAdd }: { onAdd: Props['onAddExtra'] }) {
+  const [cols, setCols] = useState('30')
+  const [rails, setRails] = useState(true)
+  const [title, setTitle] = useState('')
+  const c = num(cols, 5, 100, 30)
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-center gap-3">
+        <ExtraIcon kind="bread" />
+        <div>
+          <div className="text-sm font-medium">Breadboard</div>
+          <div className="text-xs text-white/50">Colonnes de 5 trous reliées (a–e, f–j), canal au milieu, rails + − en option.</div>
         </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {BREAD_PRESETS.map((p) => (
+          <button key={p.title} onClick={() => onAdd({ kind: 'bread', title: p.title.replace(/ \(.*\)$/, ''), cols: p.cols, rails: p.rails })} className="rounded-full border border-white/15 px-3 py-1 text-xs hover:bg-white/10">
+            + {p.title}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-white/10 pt-3 text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wider text-white/45">Sur mesure</span>
+        <label className="grid gap-1 text-xs text-white/55">Colonnes (5–100)
+          <input value={cols} onChange={(e) => setCols(e.target.value)} inputMode="numeric" className={`${field} w-20`} />
+        </label>
+        <label className="flex items-center gap-2 pb-1.5 text-xs text-white/70">
+          <input type="checkbox" checked={rails} onChange={(e) => setRails(e.target.checked)} /> rails + −
+        </label>
+        <label className="grid gap-1 text-xs text-white/55">Nom (facultatif)
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Breadboard ${c} col.`} className={`${field} w-44`} />
+        </label>
+        <button onClick={() => onAdd({ kind: 'bread', title: title.trim() || `Breadboard ${c} col.`, cols: c, rails })} className={addBtn}>Ajouter</button>
+      </div>
+    </div>
+  )
+}
+
+const PERF_PRESETS = [
+  { label: '5 × 7 cm', cols: 18, rows: 24 },
+  { label: '7 × 9 cm', cols: 24, rows: 30 },
+  { label: '9 × 15 cm', cols: 36, rows: 60 },
+  { label: 'Petite', cols: 12, rows: 10 },
+]
+
+function PerfForm({ onAdd }: { onAdd: Props['onAddExtra'] }) {
+  const [cols, setCols] = useState('20')
+  const [rows, setRows] = useState('14')
+  const [strip, setStrip] = useState(false)
+  const [title, setTitle] = useState('')
+  const c = num(cols, 3, 60, 20)
+  const r = num(rows, 3, 60, 14)
+  const kind = strip ? 'strip' : 'perf'
+  const name = strip ? 'Stripboard' : 'Plaque perforée'
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-center gap-3">
+        <ExtraIcon kind={kind} />
+        <div>
+          <div className="text-sm font-medium">Plaque perforée (perfboard)</div>
+          <div className="text-xs text-white/50">Chaque pastille est isolée : tu relies avec des fils (ponts de soudure). Stripboard : chaque ligne est une bande de cuivre.</div>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {PERF_PRESETS.map((p) => (
+          <button key={p.label} onClick={() => onAdd({ kind, title: `${name} ${p.label}`, cols: p.cols, rows: p.rows })} className="rounded-full border border-white/15 px-3 py-1 text-xs hover:bg-white/10">
+            + {p.label} ({p.cols} × {p.rows})
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-white/10 pt-3 text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wider text-white/45">Sur mesure</span>
+        <label className="grid gap-1 text-xs text-white/55">Colonnes (3–60)
+          <input value={cols} onChange={(e) => setCols(e.target.value)} inputMode="numeric" className={`${field} w-20`} />
+        </label>
+        <label className="grid gap-1 text-xs text-white/55">Lignes (3–60)
+          <input value={rows} onChange={(e) => setRows(e.target.value)} inputMode="numeric" className={`${field} w-20`} />
+        </label>
+        <label className="flex items-center gap-2 pb-1.5 text-xs text-white/70">
+          <input type="checkbox" checked={strip} onChange={(e) => setStrip(e.target.checked)} /> bandes (stripboard)
+        </label>
+        <label className="grid gap-1 text-xs text-white/55">Nom (facultatif)
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${name} ${c} × ${r}`} className={`${field} w-44`} />
+        </label>
+        <button onClick={() => onAdd({ kind, title: title.trim() || `${name} ${c} × ${r}`, cols: c, rows: r })} className={addBtn}>Ajouter</button>
       </div>
     </div>
   )
@@ -60,8 +199,9 @@ function ShopCard({ item, onAdd }: { item: ShopItem; onAdd: Props['onAdd'] }) {
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(0)
 
+  const ohms = OHM_KINDS.includes(item.kind)
   let finalValue = custom.trim() || value
-  if (item.kind === 'R' && custom.trim()) {
+  if (ohms && custom.trim()) {
     const o = parseOhms(custom)
     finalValue = o ? formatOhms(o) : undefined
   }
@@ -103,7 +243,7 @@ function ShopCard({ item, onAdd }: { item: ShopItem; onAdd: Props['onAdd'] }) {
           Anneaux : {bands.map(([n]) => n).join(' · ')}
         </div>
       )}
-      {item.kind === 'R' && custom.trim() && !finalValue && <div className="text-xs text-red-300">Valeur pas comprise (ex. 220, 4.7k, 1M)</div>}
+      {ohms && custom.trim() && !finalValue && <div className="text-xs text-red-300">Valeur pas comprise (ex. 220, 4.7k, 1M)</div>}
       {item.colors && (
         <div className="flex flex-wrap gap-1.5">
           {item.colors.map((c) => (
@@ -129,7 +269,7 @@ function ShopCard({ item, onAdd }: { item: ShopItem; onAdd: Props['onAdd'] }) {
             onAdd(item, qty, finalValue, color)
             setAdded((a) => a + qty)
           }}
-          className="flex-1 rounded-md bg-emerald-500/90 px-3 py-1.5 text-sm font-semibold text-[#0d1512] hover:bg-emerald-400 disabled:bg-white/10 disabled:text-white/40"
+          className={`flex-1 ${addBtn}`}
         >
           Ajouter à la boîte
         </button>

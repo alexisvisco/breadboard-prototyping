@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { ask, tell } from './dialog'
 import {
-  BLOCKS, LED_COLORS, POLAR, WIRE_COLORS, formatOhms, parseOhms, partName, removeBlock, unplaceBlock, type BlockId, type NodeId,
-  type Part, type Session,
+  HAS_VALUE, LED_COLORS, OHM_KINDS, POLAR, WIRE_COLORS, blockInfo, formatOhms, legCount, parseOhms, partName, removeBlock, unplaceBlock,
+  type NodeId, type Part, type Session,
 } from './model'
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
   onClose: () => void
 }
 
-export const unplacePart = (p: Part): Part => (p.kind === 'L' ? { ...p, b: null } : { ...p, a: null, b: null })
+export const unplacePart = (p: Part): Part => (p.kind === 'L' ? { ...p, b: null } : { ...p, a: null, b: null, c: null, d: null })
 export const rotateNode = (s: Session, id: NodeId, d: number): Session => {
   const pos = s.nodes[id]
   return pos ? { ...s, nodes: { ...s.nodes, [id]: { ...pos, rot: (((pos.rot + d) % 360) + 360) % 360 } } } : s
@@ -49,14 +49,14 @@ export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
     const id = target.slice(5) as NodeId
     body = (
       <>
-        <div className="px-2.5 py-1 text-xs font-semibold text-white/50">{BLOCKS[id].title}</div>
+        <div className="px-2.5 py-1 text-xs font-semibold text-white/50">{blockInfo(session, id).title}</div>
         <button className={item} onClick={act(() => update((s) => rotateNode(s, id, 90)))}>↻ Pivoter de 90° <kbd className="float-right text-white/35">R</kbd></button>
         <button className={item} onClick={act(() => update((s) => rotateNode(s, id, -90)))}>↺ Pivoter dans l'autre sens</button>
         {id !== 'bb' && (
           <>
             <div className="my-1 border-t border-white/10" />
-            <button className={item} onClick={act(() => update((s) => unplaceBlock(s, id as BlockId)))}>Ranger dans la boîte</button>
-            <button className={`${item} text-red-300`} onClick={act(() => update((s) => removeBlock(s, id as BlockId)))}>Supprimer de la boîte</button>
+            <button className={item} onClick={act(() => update((s) => unplaceBlock(s, id)))}>Ranger dans la boîte</button>
+            <button className={`${item} text-red-300`} onClick={act(() => update((s) => removeBlock(s, id)))}>Supprimer de la boîte</button>
           </>
         )}
       </>
@@ -66,9 +66,9 @@ export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
     if (!p) return null
     const colors = p.kind === 'W' || p.kind === 'L' ? WIRE_COLORS : p.kind === 'LED' ? LED_COLORS : null
     const editValue = async () => {
-      const v = await ask(`Valeur de ${p.label}`, p.value ?? '', p.kind === 'R' ? 'Ex. 220, 4.7k, 10 kΩ, 1M' : undefined)
+      const v = await ask(`Valeur de ${p.label}`, p.value ?? '', OHM_KINDS.includes(p.kind) ? 'Ex. 220, 4.7k, 10 kΩ, 1M' : undefined)
       if (v === null) return
-      if (p.kind === 'R') {
+      if (OHM_KINDS.includes(p.kind)) {
         const o = parseOhms(v)
         if (!o) return tell('Valeur pas comprise', 'Exemples : 220, 4.7k, 10 kΩ, 1M')
         setPart(p.id, { value: formatOhms(o) })
@@ -90,12 +90,15 @@ export function ContextMenu({ session, target, x, y, update, onClose }: Props) {
             ))}
           </div>
         )}
-        {['R', 'CE', 'CC', 'D'].includes(p.kind) && <button className={item} onClick={act(editValue)}>Changer la valeur…</button>}
+        {HAS_VALUE(p.kind) && <button className={item} onClick={act(editValue)}>Changer la valeur…</button>}
         {p.kind !== 'L' && (
           <button className={item} onClick={act(async () => { const n = await ask(`Renommer ${p.label}`, p.label); if (n) setPart(p.id, { label: n }) })}>Renommer…</button>
         )}
         {POLAR.includes(p.kind) && p.a && (
           <button className={item} onClick={act(() => setPart(p.id, { a: p.b, b: p.a }))}>Inverser le sens (+ / −)</button>
+        )}
+        {legCount(p.kind) > 2 && p.a && (
+          <button className={item} onClick={act(() => setPart(p.id, legCount(p.kind) === 3 ? { a: p.c ?? null, c: p.a } : { a: p.d ?? null, d: p.a, b: p.c ?? null, c: p.b }))}>Retourner (première ↔ dernière patte)</button>
         )}
         <div className="my-1 border-t border-white/10" />
         {(p.kind === 'L' ? p.b : p.a) && (

@@ -1,8 +1,9 @@
 // Panneau de gauche : la boîte de la session (ce qu'on a acheté au magasin), à glisser sur le canevas.
 
 import { useState } from 'react'
-import { PartBody } from './Canvas'
-import { BLOCKS, isPlaced, partName, placeText, type BlockId, type Kind, type Part, type Session } from './model'
+import { MultiBody, PartBody } from './PartArt'
+import { blockInfo, isPlaced, legCount, partName, placeText, type BlockId, type Kind, type Part, type Session } from './model'
+import type { Extra } from './boards'
 
 export function PartIcon({ kind, value, color }: { kind: Kind; value?: string; color: string }) {
   if (kind === 'W' || kind === 'L')
@@ -11,6 +12,15 @@ export function PartIcon({ kind, value, color }: { kind: Kind; value?: string; c
         <path d="M6,8 C20,26 44,26 58,8" fill="none" stroke={color} strokeWidth={4} strokeLinecap="round" />
         <rect x={2} y={4} width={8} height={7} rx={1} fill="#bfc3c8" />
         <rect x={54} y={4} width={8} height={7} rx={1} fill="#bfc3c8" />
+      </svg>
+    )
+  if (legCount(kind) > 2)
+    return (
+      <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
+        {[24, 32, 40].map((x) => <line key={x} x1={x} y1={14} x2={x} y2={24} stroke="#8a9096" strokeWidth={2} />)}
+        <g transform="translate(32,10) scale(0.55)">
+          <MultiBody p={{ kind, value, color }} />
+        </g>
       </svg>
     )
   return (
@@ -23,7 +33,33 @@ export function PartIcon({ kind, value, color }: { kind: Kind; value?: string; c
   )
 }
 
-export function BlockIcon({ id }: { id: BlockId }) {
+export function ExtraIcon({ kind, color = '#d7192f' }: { kind: Extra['kind']; color?: string }) {
+  if (kind === 'bread')
+    return (
+      <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
+        <rect x={6} y={2} width={52} height={20} rx={3} fill="#f3f1ea" stroke="#cfc9b8" />
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((i) => [7, 17].map((y) => <rect key={`${i}-${y}`} x={11 + i * 4.6} y={y - 1} width={2.2} height={2.2} fill="#8a8574" />))}
+        <rect x={9} y={11} width={46} height={2} fill="#d9d3c0" />
+      </svg>
+    )
+  if (kind === 'mcu')
+    return (
+      <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
+        <rect x={16} y={1} width={32} height={22} rx={3} fill={color} />
+        <rect x={25} y={3} width={14} height={9} fill="#c9ccd1" />
+        {[0, 1, 2, 3, 4].flatMap((i) => [19, 45].map((x) => <circle key={`${i}-${x}`} cx={x} cy={4 + i * 4} r={1.3} fill="#d9b44a" />))}
+      </svg>
+    )
+  return (
+    <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
+      <rect x={10} y={2} width={44} height={20} rx={2} fill={kind === 'strip' ? '#b98b4d' : '#3f7a4a'} />
+      {[0, 1, 2, 3, 4, 5, 6, 7].flatMap((i) => [7, 12, 17].map((y) => <circle key={`${i}-${y}`} cx={15 + i * 5} cy={y} r={1.5} fill="#d9b44a" />))}
+    </svg>
+  )
+}
+
+export function BlockIcon({ id, extra }: { id: BlockId; extra?: Extra }) {
+  if (extra) return <ExtraIcon kind={extra.kind} />
   return id === 'card' ? (
     <svg viewBox="0 0 64 24" className="h-6 w-16 shrink-0">
       <rect x={18} y={1} width={28} height={22} rx={3} fill="#d7192f" />
@@ -39,10 +75,12 @@ export function BlockIcon({ id }: { id: BlockId }) {
 }
 
 const GROUPS: { title: string; kinds: Kind[] }[] = [
-  { title: 'Résistances', kinds: ['R'] },
-  { title: 'Condensateurs', kinds: ['CE', 'CC'] },
-  { title: 'LED et diodes', kinds: ['LED', 'D'] },
-  { title: 'Boutons', kinds: ['BTN'] },
+  { title: 'Résistances et capteurs passifs', kinds: ['R', 'POT', 'LDR', 'NTC'] },
+  { title: 'Condensateurs et bobines', kinds: ['CE', 'CC', 'IND'] },
+  { title: 'LED et diodes', kinds: ['LED', 'RGB', 'D'] },
+  { title: 'Transistors et régulateurs', kinds: ['NPN', 'PNP', 'NMOS', 'REG'] },
+  { title: 'Boutons, sorties et capteurs', kinds: ['BTN', 'SW', 'BZ', 'MOT', 'SERVO', 'SONAR'] },
+  { title: 'Piles', kinds: ['BAT'] },
   { title: 'Fils Dupont', kinds: ['W'] },
   { title: 'Fils du câble jack', kinds: ['L'] },
 ]
@@ -91,11 +129,11 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
           </div>
         )}
 
-        {session.blocks.some((b) => match(BLOCKS[b].title)) && (
+        {session.blocks.some((b) => match(blockInfo(session, b).title)) && (
           <section>
             <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/40">Blocs</h3>
             <div className="grid gap-1.5">
-              {session.blocks.filter((b) => match(BLOCKS[b].title)).map((b) => {
+              {session.blocks.filter((b) => match(blockInfo(session, b).title)).map((b) => {
                 const on = !!session.nodes[b]
                 return (
                   <div
@@ -105,9 +143,9 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
                     onClick={() => on && onLocate(`node:${b}`)}
                     className={`${row} ${on ? used : free} ${selected === `node:${b}` ? 'ring-1 ring-yellow-300/60' : ''}`}
                   >
-                    <BlockIcon id={b} />
+                    <BlockIcon id={b} extra={session.extras?.find((x) => x.id === b)} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium leading-tight">{BLOCKS[b].title}</div>
+                      <div className="truncate font-medium leading-tight">{blockInfo(session, b).title}</div>
                       <div className="truncate text-xs text-white/45">{on ? 'posé · clic pour le voir' : 'à glisser sur le canevas'}</div>
                     </div>
                     <Remove onClick={() => onRemoveBlock(b)} />

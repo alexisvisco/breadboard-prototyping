@@ -55,7 +55,7 @@ export function Versions({ session, onRestore, onHighlight }: Props) {
     if (!(await confirmAsk(`Remettre le montage dans l'état « ${v.name} » ?`, 'L\u2019état actuel sera remplacé. Crée d\u2019abord une version si tu veux le garder.', { ok: 'Restaurer' }))) return
     const r = await fetchVersion(session.id, v.id)
     const s = normalize(r.session)
-    onRestore({ ...session, nodes: s.nodes, blocks: s.blocks, parts: s.parts })
+    onRestore({ ...session, nodes: s.nodes, blocks: s.blocks, parts: s.parts, extras: s.extras })
   }
 
   async function remove(v: VersionMeta) {

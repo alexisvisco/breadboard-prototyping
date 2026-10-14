@@ -5,8 +5,9 @@ import { Box } from './Box'
 import { DialogHost, ask, confirmAsk, tell } from './dialog'
 import { Canvas, nodeCenter, portWorld, type CanvasApi } from './Canvas'
 import { ContextMenu, rotateNode, unplacePart } from './ContextMenu'
+import { registerExtras } from './boards'
 import {
-  BLOCKS, addBlock, diffMarks, addToBox, analyse, normalize, newSession, partName, placeText, removeBlock, summary, type BlockId, type NodeId,
+  addExtra, blockInfo, addBlock, diffMarks, addToBox, analyse, normalize, newSession, partName, placeText, removeBlock, summary, type BlockId, type NodeId,
   type Part, type Session,
 } from './model'
 import { deleteLayer, fetchLayers, focusOf, putLayer, resolvePort, type Layer } from './layers'
@@ -210,6 +211,8 @@ function SessionPage({ id, go }: { id: string; go: (p: string) => void }) {
 }
 
 function Editor({ session, setSession, save, go }: { session: Session; setSession: React.Dispatch<React.SetStateAction<Session | null>>; save: Save; go: (p: string) => void }) {
+  // Les planches ajoutées doivent être connues avant que quoi que ce soit les dessine ou les analyse.
+  registerExtras(session.extras)
   const [selected, setSelected] = useState<string | null>(null)
   const [hoverText, setHoverText] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -372,7 +375,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
     update((s) => ({ ...s, parts: s.parts.filter((q) => q.id !== p.id) }))
   }
   const removeBlk = async (b: BlockId) => {
-    if (!(await confirmAsk(`Supprimer « ${BLOCKS[b].title} » de la boîte ?`, undefined, { ok: 'Supprimer', danger: true }))) return
+    if (!(await confirmAsk(`Supprimer « ${blockInfo(session, b).title} » de la boîte ?`, undefined, { ok: 'Supprimer', danger: true }))) return
     update((s) => removeBlock(s, b))
   }
 
@@ -459,7 +462,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
 
           {(sel || selNode) && (
             <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-yellow-300/40 bg-[#18211d]/95 px-4 py-2 text-sm shadow-lg">
-              <span className="font-semibold">{sel ? partName(sel) : BLOCKS[selNode!].title}</span>
+              <span className="font-semibold">{sel ? partName(sel) : blockInfo(session, selNode!).title}</span>
               {sel && <span className="text-white/65">{placeText(sel)}</span>}
               {selNode && (
                 <button className="rounded bg-white/10 px-2.5 py-1 hover:bg-white/20" onClick={() => update((s) => rotateNode(s, selNode, 90))}>
@@ -543,6 +546,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
         onClose={() => setShopOpen(false)}
         onAdd={(it, qty, value, color) => update((s) => addToBox(s, it.kind, qty, value, color))}
         onAddBlock={(b) => update((s) => addBlock(s, b))}
+        onAddExtra={(spec) => update((s) => addExtra(s, spec))}
       />
       {importOpen && (
         <ImportDialog

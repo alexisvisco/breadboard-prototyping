@@ -1,6 +1,8 @@
 // Géométrie des trois blocs du canevas : breadboard, carte Makerfabs, câble jack Nedis.
 // Toutes les coordonnées sont locales au bloc (origine en haut à gauche).
 
+import { EXTRA_PORT, NET_LABEL, extraOf } from './boards'
+
 export const P = 24 // pas entre deux trous
 
 // ------------------------------------------------------------------ breadboard
@@ -77,9 +79,11 @@ export const BB_HOLES: Hole[] = (() => {
 })()
 export const BB_HOLE = new Map(BB_HOLES.map((h) => [h.id, h]))
 
-export const isHole = (port: string) => BB_HOLE.has(port)
+export const isHole = (port: string) => BB_HOLE.has(port) || EXTRA_PORT.get(port)?.kind === 'hole'
 
 export function holeLabel(id: string): string {
+  const x = EXTRA_PORT.get(id)
+  if (x) return `${x.name} · ${extraOf(x.node)?.title ?? x.node}`
   const m = /^([+-])([HB])(\d+)$/.exec(id)
   if (!m) return id
   return `rail ${m[1] === '+' ? '+' : '−'} du ${m[2] === 'H' ? 'haut' : 'bas'}, sous la colonne ${m[3]}`
@@ -87,6 +91,8 @@ export function holeLabel(id: string): string {
 
 /** Groupe de trous reliés sous la breadboard. */
 export function stripOf(id: string): string {
+  const x = EXTRA_PORT.get(id)
+  if (x) return x.net
   const rail = /^([+-][HB])\d+$/.exec(id)
   if (rail) return `rail${rail[1]}`
   const m = /^([a-j])(\d+)$/.exec(id)!
@@ -94,6 +100,8 @@ export function stripOf(id: string): string {
 }
 
 export function stripLabel(strip: string): string {
+  const x = NET_LABEL.get(strip)
+  if (x) return x
   const rail = /^rail([+-])([HB])$/.exec(strip)
   if (rail) return `rail ${rail[1] === '+' ? '+' : '−'} du ${rail[2] === 'H' ? 'haut' : 'bas'}`
   const col = /^col(\d+)-(haut|bas)$/.exec(strip)
@@ -101,16 +109,50 @@ export function stripLabel(strip: string): string {
   return strip
 }
 
-/** Trou voisin à 3 pas vers la droite (numéros décroissants), pour poser la 2e patte. */
-export function neighbourHole(id: string): string {
-  const rail = /^([+-][HB])(\d+)$/.exec(id)
-  if (rail) {
-    const j = railIndex(id)
-    return railShift(id, j + 3 < RAIL_HOLES ? 3 : -3)
+/** Trou à `k` pas vers la droite de l'écran (null si hors de la planche). Breadboard d'origine : numéros décroissants. */
+export function holeStep(id: string, k: number): string | null {
+  const x = EXTRA_PORT.get(id)
+  if (x) return x.step(k)
+  if (/^[+-][HB]\d+$/.test(id)) {
+    const j = railIndex(id) + k
+    return j >= 0 && j < RAIL_HOLES ? `${id.slice(0, 2)}${RAIL_COLS[j]}` : null
   }
-  const m = /^([a-j])(\d+)$/.exec(id)!
-  const c = Number(m[2])
-  return `${m[1]}${c - 3 >= 1 ? c - 3 : c + 3}`
+  const m = /^([a-j])(\d+)$/.exec(id)
+  if (!m) return null
+  const c = Number(m[2]) - k
+  return c >= 1 && c <= COLS ? `${m[1]}${c}` : null
+}
+
+/** Trou voisin à 3 pas vers la droite, pour poser la 2e patte. */
+export const neighbourHole = (id: string): string => holeStep(id, 3) ?? holeStep(id, -3) ?? id
+
+/** Trous où poser les `n` pattes d'une pièce lâchée sur `id` : écartées de 3 pas (2 pattes) ou côte à côte (3 pattes ou plus). */
+export function legHoles(id: string, n: number): string[] {
+  if (n <= 2) return [id, neighbourHole(id)]
+  const right = holeStep(id, n - 1) !== null
+  return Array.from({ length: n }, (_, i) => (right ? holeStep(id, i) : holeStep(id, -i)) ?? id)
+}
+
+/** Trous « voisins » d'un port pour la vue focus : son groupe (colonne, ligne de bande) ou quelques trous de rail. */
+export function nearPorts(port: string): string[] {
+  const x = EXTRA_PORT.get(port)
+  if (x) return x.near
+  if (/^[+-][HB]\d+$/.test(port)) return [-2, -1, 0, 1, 2].map((d) => railShift(port, d))
+  const m = /^([a-j])(\d+)$/.exec(port)
+  if (!m) return [port]
+  const half = 'abcde'.includes(m[1]) ? 'abcde' : 'fghij'
+  return [...half].map((l) => `${l}${m[2]}`)
+}
+
+/** Extrémités de la bande colorée posée sur le groupe d'un trou, et (breadboard d'origine) de la rangée entière. */
+export function bandEnds(port: string): { ends: [string, string]; row?: [string, string] } | null {
+  const x = EXTRA_PORT.get(port)
+  if (x) return { ends: x.band }
+  if (/^[+-][HB]\d+$/.test(port)) return { ends: [railShift(port, -2), railShift(port, 2)] }
+  const m = /^([a-j])(\d+)$/.exec(port)
+  if (!m) return null
+  const top = 'abcde'.includes(m[1])
+  return { ends: [`${top ? 'a' : 'f'}${m[2]}`, `${top ? 'e' : 'j'}${m[2]}`], row: [`${m[1]}62`, `${m[1]}1`] }
 }
 
 // ------------------------------------------------------------------ carte Makerfabs

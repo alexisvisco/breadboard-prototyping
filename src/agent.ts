@@ -1,19 +1,20 @@
 // Échange avec un assistant (Claude) en JSON : mode d'emploi + état actuel à copier,
 // et lecture / vérification d'un JSON proposé en retour (nouvelle version, calques).
 
-import { BB_HOLE, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS } from './geom'
+import { BREAD_PRESETS, EXTRA_PORT, MCU_MODELS, cleanExtra, extraDesc, layoutOf, registerExtras, type Extra } from './boards'
+import { CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, isHole } from './geom'
 import { resolvePort, type Layer } from './layers'
 import {
-  BLOCKS, LED_COLORS, SHOP, WIRE_COLORS, newId, normalize, summary, analyse, type BlockId, type Kind, type Part, type Session,
+  BLOCKS, LEGS, LEG_NAMES, LED_COLORS, SHOP, WIRE_COLORS, legCount, legsOf, newId, normalize, summary, analyse, type BlockId, type Kind, type Part, type Session,
 } from './model'
 
-const KINDS: Kind[] = ['R', 'CE', 'CC', 'LED', 'D', 'BTN', 'W', 'L']
+const KINDS: Kind[] = ['R', 'CE', 'CC', 'LED', 'D', 'BTN', 'W', 'L', ...SHOP.map((s) => s.kind)]
 
 /** Texte à coller dans une conversation avec Claude : règles + état actuel. */
 export function agentBrief(s: Session, origin: string): string {
   const pins = CARD_PINS.map((p) => `${p.id}=${p.name}`).join(', ')
   const leads = JACK_LEADS.map((l) => `${l.id} (${l.label})`).join(', ')
-  const shop = SHOP.map((it) => `- ${it.kind} : ${it.title}${it.values ? ` — valeurs : ${it.values.join(', ')}` : ''}${it.colors ? ` — couleurs : ${it.colors.map((c) => `${c.name} ${c.hex}`).join(', ')}` : ''}`).join('\n')
+  const shop = SHOP.map((it) => `- ${it.kind} : ${it.title}${LEG_NAMES[it.kind] ? ` — ${legCount(it.kind)} pattes ${LEGS.slice(0, legCount(it.kind)).join('/')} = ${LEG_NAMES[it.kind]!.join(' / ')}` : ''}${it.values ? ` — valeurs : ${it.values.join(', ')}` : ''}${it.colors ? ` — couleurs : ${it.colors.map((c) => `${c.name} ${c.hex}`).join(', ')}` : ''}`).join('\n')
   return `# Montage breadboard « ${s.name} » — mode d'emploi pour Claude
 
 Tu aides à reproduire et diagnostiquer un montage électronique réel (l'utilisateur débute).
@@ -49,14 +50,31 @@ Couleur ("color") : hexadécimal ; pour les fils, une de : ${WIRE_COLORS.map((c)
 Mets dans "a" et "b" les trous où vont ses deux pattes, ex. "a": "e25", "b": "e21".
 - CE (chimique) et LED : "a" = patte + (longue). D (diode) : "a" = anode, "b" = cathode (côté bague).
 - Les deux pattes d'une pièce doivent être dans deux groupes de trous différents, sinon elle est court-circuitée.
+- Pièces à 3 ou 4 pattes (POT, NPN, PNP, NMOS, REG, SERVO, RGB, SONAR) : "a", "b", "c" (et "d") dans l'ordre des noms ci-dessus ; les pattes se posent côte à côte (ex. "a": "e25", "b": "e24", "c": "e23"), dans trois colonnes différentes. Toutes posées, ou aucune.
 - W (fil Dupont) : "a" et "b" = un trou ou une broche de la carte. "b": null = bout libre.
 - Remettre une pièce dans la boîte : "a": null, "b": null.
 
 ## Blocs (carte, câble jack)
-- "blocks" : liste des blocs dans la boîte, parmi "card" (${BLOCKS.card.title}) et "jack" (${BLOCKS.jack.title}).
+- "blocks" : liste des blocs dans la boîte : "card" (${BLOCKS.card.title}), "jack" (${BLOCKS.jack.title}), et l'identifiant de chaque planche de "extras".
 - Un bloc est posé s'il a une position dans "nodes" : { "x", "y", "rot" } (rot = 0, 90, 180 ou 270). "nodes.bb" est la breadboard (largeur 1560, hauteur 456).
 - Broches de la carte (pour les fils W) : ${pins}.
 - Fils du câble jack (pièces "kind": "L", "a" = départ fixe, "b" = trou où le bout est planté ou null) : ${leads}.
+
+## Planches supplémentaires ("extras")
+Le magasin permet d'ajouter d'autres planches. Chacune est un objet de "session.extras", posée comme un bloc ("nodes.<id>" = { x, y, rot }) et listée dans "blocks".
+  { "id": "bread1", "kind": "bread", "title": "Breadboard 400", "cols": 30, "rails": true }
+  { "id": "perf1", "kind": "perf", "title": "Plaque 5×7", "cols": 18, "rows": 24 }
+  { "id": "strip1", "kind": "strip", "title": "Stripboard", "cols": 20, "rows": 10 }
+  { "id": "mcu1", "kind": "mcu", "title": "ESP32 DevKit", "model": "esp32-devkit" }
+Ne modifie pas une planche existante (taille, modèle) : ajoutes-en une nouvelle avec un nouvel "id" (bread2, perf2, mcu2…) si besoin.
+Les ports d'une planche s'écrivent "<id>:<port>" (ex. "bread1:e12", "perf1:C4", "mcu1:IO5") et s'utilisent partout où l'on met un trou ou une broche (pattes, fils, calques).
+- bread : colonnes numérotées 1 (gauche) → "cols" (droite), lignes a–e et f–j, comme la breadboard principale mais dans l'autre sens ; 5 trous d'une colonne-moitié reliés. Si "rails" : "+H1…", "-H1…" (haut) et "+B1…", "-B1…" (bas), tout un rail est relié.
+- perf : colonnes A, B, C… (AA après Z) et lignes 1, 2, 3… : "perf1:C4" = colonne C, ligne 4. Aucun trou n'est relié aux autres : on relie avec des fils (ponts de soudure). strip : même chose, mais tous les trous d'une ligne sont reliés (bande de cuivre).
+- mcu : cartes de développement. Les broches ont leur nom pour identifiant (ex. "mcu1:IO5", "mcu1:3V3", "mcu1:GND", "mcu1:GND-2" pour la 2e masse). Seuls les fils (W) vont sur les broches.
+Planches existantes :
+${(s.extras ?? []).map((x) => `- ${x.id} (${x.title}, ${extraDesc(x)})${s.nodes[x.id] ? '' : ' — pas posée'}${x.kind === 'mcu' ? ` : ${layoutOf(x.id)?.ports.map((q) => `${q.id.split(':')[1]}${q.name !== q.id.split(':')[1] ? `=${q.name}` : ''}`).join(', ')}` : ''}`).join('\n') || '(aucune)'}
+Modèles de cartes ("model") : ${Object.entries(MCU_MODELS).map(([k, m]) => `${k} (${m.title})`).join(' ; ')}.
+Tailles de breadboard usuelles : ${BREAD_PRESETS.map((p) => `${p.title} = ${p.cols} colonnes${p.rails ? ' + rails' : ''}`).join(' ; ')}.
 
 ## Calques d'annotation (facultatif, pour guider une mesure)
 { "id": "mesure-1", "name": "Mesure 1",
@@ -126,6 +144,25 @@ export function parseImport(text: string, current: Session): ImportResult {
     return out
   }
 
+  // Planches supplémentaires : celles qu'on connaît déjà gardent leur forme ; les nouvelles sont vérifiées.
+  const extras: Extra[] = [...(current.extras ?? [])]
+  if (Array.isArray(sess.extras)) {
+    for (const raw of sess.extras as Record<string, unknown>[]) {
+      const id = String(raw?.id ?? '')
+      const known = extras.find((x) => x.id === id)
+      if (known) {
+        if (JSON.stringify(cleanExtra({ ...known, ...raw, id } as Extra)) !== JSON.stringify(known)) out.warnings.push(`Planche « ${id} » : sa taille / son modèle ne peuvent pas changer, l'existante est gardée.`)
+        continue
+      }
+      const kind = raw?.kind
+      if (!/^[a-z][a-z0-9]{1,20}$/i.test(id) || ['bb', 'card', 'jack'].includes(id)) out.errors.push(`Planche « ${id} » : identifiant invalide.`)
+      else if (kind !== 'bread' && kind !== 'perf' && kind !== 'strip' && kind !== 'mcu') out.errors.push(`Planche « ${id} » : "kind" doit être bread, perf, strip ou mcu.`)
+      else if (kind === 'mcu' && !MCU_MODELS[String(raw.model)]) out.errors.push(`Planche « ${id} » : modèle « ${String(raw.model)} » inconnu (${Object.keys(MCU_MODELS).join(', ')}).`)
+      else extras.push(cleanExtra({ id, kind, title: String(raw.title ?? id), cols: Number(raw.cols) || undefined, rows: Number(raw.rows) || undefined, rails: !!raw.rails, model: kind === 'mcu' ? String(raw.model) : undefined }))
+    }
+  }
+  registerExtras(extras)
+
   const ids = new Set<string>()
   const parts: Part[] = []
   ;(sess.parts as Record<string, unknown>[]).forEach((p, i) => {
@@ -143,37 +180,49 @@ export function parseImport(text: string, current: Session): ImportResult {
         out.errors.push(`${name} : patte ${end} sur « ${String(v)} », qui n'existe pas.`)
         return null
       }
-      if (kind !== 'W' && kind !== 'L' && !BB_HOLE.has(r)) out.errors.push(`${name} : seuls les fils peuvent aller sur une broche (${String(v)}).`)
+      if (kind !== 'W' && kind !== 'L' && !isHole(r)) out.errors.push(`${name} : seuls les fils peuvent aller sur une broche (${String(v)}).`)
       return r
     }
-    const a = kind === 'L' ? id : port(p.a, 'a')
-    const b = port(p.b, 'b')
-    if (kind !== 'W' && kind !== 'L' && !!a !== !!b) out.errors.push(`${name} : une seule patte placée ; mets les deux, ou aucune.`)
+    const legs = legsOf({ kind })
+    const at: Partial<Record<(typeof LEGS)[number], string | null>> = {}
+    for (const l of legs) at[l] = l === 'a' && kind === 'L' ? id : port(p[l], l)
+    const placed = legs.filter((l) => at[l]).length
+    if (kind !== 'W' && kind !== 'L' && placed > 0 && placed < legs.length) out.errors.push(`${name} : ${placed} patte(s) placée(s) sur ${legs.length} ; mets-les toutes, ou aucune.`)
     const shop = SHOP.find((s) => s.kind === kind)
-    parts.push({
+    const part: Part = {
       id,
       kind,
       label: name,
       value: p.value === undefined || p.value === null ? undefined : String(p.value),
       color: String(p.color ?? (kind === 'L' ? JACK_LEAD.get(id)!.color : (shop?.color ?? '#888888'))),
-      a: a ?? (kind === 'W' ? b : null),
-      b: kind === 'W' && !a ? null : b,
-    })
+      a: at.a ?? (kind === 'W' ? (at.b ?? null) : null),
+      b: kind === 'W' && !at.a ? null : (at.b ?? null),
+    }
+    if (legs.length > 2) {
+      part.c = at.c ?? null
+      if (legs.length > 3) part.d = at.d ?? null
+    }
+    parts.push(part)
   })
 
   const nodes = { ...((sess.nodes as Session['nodes']) ?? {}) }
   if (!nodes.bb) nodes.bb = current.nodes.bb
-  let blocks = (Array.isArray(sess.blocks) ? sess.blocks : current.blocks).filter((b): b is BlockId => b === 'card' || b === 'jack')
-  for (const b of ['card', 'jack'] as BlockId[]) if (nodes[b] && !blocks.includes(b)) blocks = [...blocks, b]
-  for (const b of ['card', 'jack'] as BlockId[]) {
+  const blockIds = ['card', 'jack', ...extras.map((x) => x.id)]
+  let blocks = (Array.isArray(sess.blocks) ? sess.blocks : current.blocks).filter((b): b is BlockId => blockIds.includes(b))
+  for (const b of blockIds) if (nodes[b] && !blocks.includes(b)) blocks = [...blocks, b]
+  for (const x of extras) if (!blocks.includes(x.id)) blocks = [...blocks, x.id]
+  for (const b of blockIds) {
     const pos = nodes[b]
     if (pos && (typeof pos.x !== 'number' || typeof pos.y !== 'number')) out.errors.push(`nodes.${b} : il faut "x" et "y" numériques.`)
   }
   if (!nodes.card && parts.some((p) => p.kind === 'W' && [p.a, p.b].some((e) => e && CARD_PIN.has(e))))
     out.warnings.push('Des fils vont sur la carte alors qu’elle n’est pas posée (nodes.card manquant) : ils seront invisibles.')
+  for (const x of extras)
+    if (!nodes[x.id] && parts.some((p) => legsOf(p).some((l) => EXTRA_PORT.get(p[l] ?? '')?.node === x.id)))
+      out.warnings.push(`Des pièces vont sur « ${x.id} » alors qu’elle n’est pas posée (nodes.${x.id} manquant) : elles seront invisibles.`)
 
   // Le mode d'emploi donne déjà les rails par colonne : pas de conversion à l'import.
-  const session = normalize({ id: current.id, name: current.name, createdAt: current.createdAt, nodes, blocks, parts, railNumbering: 'col' })
+  const session = normalize({ id: current.id, name: current.name, createdAt: current.createdAt, nodes, blocks, parts, ...(extras.length ? { extras } : {}), railNumbering: 'col' })
   if (blocks.includes('jack') && !parts.some((p) => p.kind === 'L')) out.warnings.push('Bloc jack sans ses fils : ils sont recréés, débranchés.')
   out.session = session
   return out

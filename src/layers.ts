@@ -1,8 +1,9 @@
 // Calques d'annotation : des repères posés par Claude (ou par l'app) par-dessus le montage,
 // stockés à part de la session. Chaque calque s'affiche ou se masque indépendamment.
 
-import { BB_HOLE, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, isHole, railIndex, stripOf } from './geom'
-import { portShort, type NodeId, type Session } from './model'
+import { EXTRA_PORT } from './boards'
+import { BB_HOLE, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, nearPorts } from './geom'
+import { LEGS, portShort, type NodeId, type Session } from './model'
 
 export type Annotation =
   /** Cercle sur un trou / une broche / un fil jack : où poser une pointe du multimètre. */
@@ -41,6 +42,15 @@ export function resolvePort(ref: string): string | null {
   if (BB_HOLE.has(r)) return r
   if (BB_HOLE.has(r.toLowerCase())) return r.toLowerCase()
   const low = r.toLowerCase()
+  // Planches supplémentaires : « mcu1:IO5 », « perf1:c4 » ; pour les cartes, le nom court après « : » suffit aussi (alias « VP », « D1 »).
+  if (EXTRA_PORT.has(r)) return r
+  const colon = r.indexOf(':')
+  if (colon > 0) {
+    const pre = r.slice(0, colon)
+    const rest = r.slice(colon + 1).toLowerCase()
+    for (const x of EXTRA_PORT.values())
+      if (x.node === pre && (x.id.slice(colon + 1).toLowerCase() === rest || x.name.toLowerCase().split('/').includes(rest))) return x.id
+  }
   const pin = CARD_PINS.find((p) => p.id === r || p.name.toLowerCase() === low || p.name.toLowerCase().split('/').includes(low))
   if (pin) return pin.id
   const lead = JACK_LEADS.find((l) => l.id === r || l.label.toLowerCase() === low)
@@ -88,30 +98,26 @@ export interface Focus {
 /** Ce qui reste bien visible quand on se concentre sur un calque. */
 export function focusOf(s: Session, l: Layer): Focus {
   const ports = layerPorts(l)
-  const strips = new Set(ports.filter((p) => isHole(p) && !/^[+-]/.test(p)).map(stripOf))
-  const rails = ports.filter((p) => railIndex(p) >= 0)
-  const near = (port: string | null) => {
-    if (!port) return false
-    if (ports.includes(port)) return true
-    if (isHole(port) && !/^[+-]/.test(port)) return strips.has(stripOf(port))
-    const j = railIndex(port)
-    return j >= 0 && rails.some((r) => r.slice(0, 2) === port.slice(0, 2) && Math.abs(railIndex(r) - j) <= 2)
-  }
+  const near = new Set(ports.flatMap(nearPorts))
   const parts = new Set<string>()
-  for (const p of s.parts) if (near(p.kind === 'L' ? p.b : p.a) || near(p.b)) parts.add(p.id)
+  for (const p of s.parts) if (near.has((p.kind === 'L' ? p.b : p.a) ?? '') || LEGS.some((k) => near.has(p[k] ?? ''))) parts.add(p.id)
   for (const it of l.items) if (it.type === 'part') {
     const p = resolvePart(s, it.part)
     if (p) parts.add(p.id)
   }
   const nodes = new Set<NodeId>(['bb'])
+  const owner = (port: string | null | undefined) => (!port ? null : CARD_PIN.has(port) ? 'card' : JACK_LEAD.has(port) ? 'jack' : (EXTRA_PORT.get(port)?.node ?? null))
   for (const p of ports) {
-    if (CARD_PIN.has(p)) nodes.add('card')
-    if (JACK_LEAD.has(p)) nodes.add('jack')
+    const o = owner(p)
+    if (o) nodes.add(o)
   }
   for (const id of parts) {
     const p = s.parts.find((x) => x.id === id)!
     if (p.kind === 'L') nodes.add('jack')
-    if ([p.a, p.b].some((e) => e && CARD_PIN.has(e))) nodes.add('card')
+    for (const k of LEGS) {
+      const o = owner(p[k])
+      if (o) nodes.add(o)
+    }
   }
   return { parts, ports, nodes }
 }

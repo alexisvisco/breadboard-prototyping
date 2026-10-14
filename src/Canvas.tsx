@@ -3,14 +3,18 @@
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import {
-  BB_HOLE, BB_HOLES, CARD_JACK, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, JACK_PLUG, holeLabel, isHole, localToWorld, neighbourHole,
+  BB_HOLE, BB_HOLES, CARD_JACK, CARD_PIN, CARD_PINS, JACK_LEAD, JACK_LEADS, JACK_PLUG, holeLabel, isHole, legHoles, localToWorld,
   stripLabel, stripOf, type Pos, type Pt,
 } from './geom'
-import { BLOCKS, POLAR, type Ghost, portLabel, resistorBands, type BlockId, type NodeId, type Part, type Session } from './model'
+import { EXTRA_PORT, layoutOf } from './boards'
+import {
+  LEG_SHORT, POLAR, blockInfo, legCount, legsOf, type Ghost, portLabel, type Leg, type NodeId, type Part, type Session,
+} from './model'
 import { rotateNode } from './ContextMenu'
 import type { Focus, Layer } from './layers'
-import { BreadboardNode, CardNode, FlipProvider, JackNode } from './nodes'
+import { BreadboardNode, CardNode, ExtraNode, FlipProvider, JackNode } from './nodes'
 import { Overlay, Pill } from './Overlay'
+import { MULTI_LIFT, MultiBody, PartBody } from './PartArt'
 
 export interface CanvasApi {
   centerOn(p: Pt): void
@@ -22,7 +26,9 @@ export interface CanvasApi {
 
 const nodeWorld = (s: Session, id: NodeId, p: Pt): Pt | null => {
   const pos = s.nodes[id]
-  return pos ? localToWorld(pos, BLOCKS[id].w, BLOCKS[id].h, p) : null
+  if (!pos) return null
+  const { w, h } = blockInfo(s, id)
+  return localToWorld(pos, w, h, p)
 }
 
 /** Position monde d'un port (trou, broche, départ d'un fil jack) ; null si son bloc n'est pas posé. */
@@ -33,11 +39,16 @@ export function portWorld(s: Session, port: string): Pt | null {
   if (pin) return nodeWorld(s, 'card', pin)
   const lead = JACK_LEAD.get(port)
   if (lead) return nodeWorld(s, 'jack', lead)
+  const x = EXTRA_PORT.get(port)
+  if (x) return nodeWorld(s, x.node, x)
   return null
 }
 
 /** Centre d'un bloc posé, en coordonnées monde. */
-export const nodeCenter = (s: Session, id: NodeId) => nodeWorld(s, id, { x: BLOCKS[id].w / 2, y: BLOCKS[id].h / 2 })
+export const nodeCenter = (s: Session, id: NodeId) => {
+  const { w, h } = blockInfo(s, id)
+  return nodeWorld(s, id, { x: w / 2, y: h / 2 })
+}
 
 /** Port le plus proche d'un point monde (trous, et broches de la carte si autorisé). */
 function nearestPort(s: Session, p: Pt, withPins: boolean): string | null {
@@ -50,6 +61,9 @@ function nearestPort(s: Session, p: Pt, withPins: boolean): string | null {
   }
   for (const h of BB_HOLES) test(h.id, nodeWorld(s, 'bb', h))
   if (withPins && s.nodes.card) for (const pin of CARD_PINS) test(pin.id, nodeWorld(s, 'card', pin))
+  for (const x of s.extras ?? [])
+    if (s.nodes[x.id])
+      for (const q of layoutOf(x.id)?.ports ?? []) if (withPins || q.kind === 'hole') test(q.id, nodeWorld(s, x.id, q))
   return best
 }
 
@@ -61,7 +75,7 @@ export function portDescription(port: string): string {
 type Mode =
   | { type: 'pan'; sx: number; sy: number; tx: number; ty: number; moved: boolean }
   | { type: 'node'; id: NodeId; dx: number; dy: number; sx: number; sy: number; moved: boolean }
-  | { type: 'end'; partId: string; end: 'a' | 'b'; pins: boolean }
+  | { type: 'end'; partId: string; end: Leg; pins: boolean }
 
 interface Props {
   session: Session
@@ -99,9 +113,9 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
   const fit = useCallback(() => {
     const r = svgRef.current?.getBoundingClientRect()
     if (!r) return
-    const s0 = { nodes: session.nodes } as Session
+    const s0 = { nodes: session.nodes, extras: session.extras } as Session
     const pts = (Object.keys(session.nodes) as NodeId[]).flatMap((id) => {
-      const { w, h } = BLOCKS[id]
+      const { w, h } = blockInfo(s0, id)
       return [{ x: -10, y: -40 }, { x: w + 10, y: -40 }, { x: -10, y: h + 90 }, { x: w + 10, y: h + 90 }]
         .map((p) => nodeWorld(s0, id, p))
         .filter((p): p is Pt => !!p)
@@ -112,7 +126,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
     const s = Math.min((r.width - 60) / (x1 - x0), (r.height - 60) / (y1 - y0), 1.5)
     setView({ s, tx: (r.width - (x1 - x0) * s) / 2 - x0 * s, ty: (r.height - (y1 - y0) * s) / 2 - y0 * s })
-  }, [session.nodes])
+  }, [session.nodes, session.extras])
 
   useImperativeHandle(apiRef, () => ({
     fit,
@@ -190,7 +204,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     if (handle) {
       const [partId, end] = handle.getAttribute('data-handle')!.split('|')
       const part = session.parts.find((p) => p.id === partId)!
-      mode.current = { type: 'end', partId, end: end as 'a' | 'b', pins: part.kind === 'W' || part.kind === 'L' }
+      mode.current = { type: 'end', partId, end: end as Leg, pins: part.kind === 'W' || part.kind === 'L' }
       setSelected(partId)
       setDragPos(toWorld(e.clientX, e.clientY))
       return
@@ -267,8 +281,8 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     const data = e.dataTransfer.getData('text/plain')
     const w = toWorld(e.clientX, e.clientY)
     if (data.startsWith('block:')) {
-      const id = data.slice(6) as BlockId
-      const { w: bw, h: bh } = BLOCKS[id]
+      const id = data.slice(6)
+      const { w: bw, h: bh } = blockInfo(session, id)
       onChange((s) => ({ ...s, nodes: { ...s.nodes, [id]: { x: Math.round(w.x - bw / 2), y: Math.round(w.y - bh / 2), rot: 0 } } }))
       setSelected(`node:${id}`)
       return
@@ -278,7 +292,11 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
     if (!part) return
     const port = nearestPort(session, w, part.kind === 'W')
     if (!port || (part.kind !== 'W' && !isHole(port))) return
-    setPart(part.id, { a: port, b: part.kind === 'W' ? null : neighbourHole(port) })
+    if (part.kind === 'W') setPart(part.id, { a: port, b: null })
+    else {
+      const holes = legHoles(port, legCount(part.kind))
+      setPart(part.id, Object.fromEntries(legsOf(part).map((l, i) => [l, holes[i]])))
+    }
     setSelected(part.id)
   }
 
@@ -320,10 +338,10 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           />
         )}
 
-        {(['jack', 'bb', 'card'] as NodeId[]).map((id) => {
+        {(['jack', 'bb', 'card', ...(session.extras ?? []).map((x) => x.id)] as NodeId[]).map((id) => {
           const pos: Pos | undefined = nodes[id]
           if (!pos) return null
-          const { w, h } = BLOCKS[id]
+          const { w, h } = blockInfo(session, id)
           return (
             <g key={id} data-node={id} transform={`translate(${pos.x},${pos.y}) rotate(${pos.rot},${w / 2},${h / 2})`} opacity={focus && !focus.nodes.has(id) ? 0.3 : 1}>
               {selected === `node:${id}` && (
@@ -333,6 +351,7 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
                 {id === 'bb' && <BreadboardNode hover={hover} flash={flash} />}
                 {id === 'card' && <CardNode hover={hover} flash={flash} />}
                 {id === 'jack' && <JackNode colors={leadColors} />}
+                {session.extras?.map((x) => (x.id === id ? <ExtraNode key={id} extra={x} hover={hover} flash={flash} /> : null))}
               </FlipProvider>
             </g>
           )
@@ -393,6 +412,45 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
           const mark = marks[p.id]
           const glow = isHl ? '#ff6b6b' : isSel ? '#ffd43b' : mark
           const flexible = p.kind === 'W' || p.kind === 'L'
+          if (legCount(p.kind) > 2) {
+            const legs = legsOf(p)
+            const pts = legs.map((l, i) => {
+              if (dragging && m.end === l) return dragPos
+              const port = p[l]
+              return (port ? portWorld(session, port) : null) ?? { x: anchorA.x + 24 * i, y: anchorA.y + 46 }
+            })
+            const first = pts[0]
+            const last = pts[pts.length - 1]
+            const ang = Math.atan2(last.y - first.y, last.x - first.x)
+            const cx = pts.reduce((t, q) => t + q.x, 0) / pts.length
+            const cy = pts.reduce((t, q) => t + q.y, 0) / pts.length
+            const O = { x: cx + Math.sin(ang) * MULTI_LIFT, y: cy - Math.cos(ang) * MULTI_LIFT }
+            const local = pts.map((q) => {
+              const dx = q.x - O.x
+              const dy = q.y - O.y
+              return { x: dx * Math.cos(ang) + dy * Math.sin(ang), y: -dx * Math.sin(ang) + dy * Math.cos(ang) }
+            })
+            const short = LEG_SHORT[p.kind] ?? []
+            return (
+              <g key={p.id} data-part={p.id} style={{ cursor: 'pointer' }} opacity={focus && !focus.parts.has(p.id) ? 0.13 : 1}>
+                {glow && (
+                  <>
+                    <circle cx={O.x} cy={O.y} r={34} fill={glow} fillOpacity={0.5} />
+                    {pts.map((q, i) => <circle key={i} cx={q.x} cy={q.y} r={14} fill={glow} fillOpacity={0.5} />)}
+                  </>
+                )}
+                <g transform={`translate(${O.x},${O.y}) rotate(${(ang * 180) / Math.PI})`}>
+                  {local.map((q, i) => <line key={i} x1={q.x} y1={q.y} x2={Math.max(-12, Math.min(12, q.x))} y2={10} stroke="#8a9096" strokeWidth={3} />)}
+                  <MultiBody p={p} />
+                </g>
+                <text x={O.x} y={O.y - 26} fontSize={12} fontWeight={700} textAnchor="middle" fill="#14201c" stroke="#f3f1ea" strokeWidth={4} paintOrder="stroke">{p.label}</text>
+                {pts.map((q, i) => short[i] && <text key={i} x={q.x} y={q.y + 22} fontSize={10} fontWeight={700} textAnchor="middle" fill="#ffd43b" stroke="#14201c" strokeWidth={3} paintOrder="stroke" pointerEvents="none">{short[i]}</text>)}
+                {legs.map((l, i) => (
+                  <circle key={l} data-handle={`${p.id}|${l}`} cx={pts[i].x} cy={pts[i].y} r={8} fill="#fff" stroke="#14201c" strokeWidth={2.5} style={{ cursor: 'move' }} />
+                ))}
+              </g>
+            )
+          }
           const sag = Math.max(30, Math.hypot(B.x - A.x, B.y - A.y) * 0.18)
           const wire = `M${A.x},${A.y} C${A.x + (B.x - A.x) * 0.25},${Math.max(A.y, B.y) + sag} ${A.x + (B.x - A.x) * 0.75},${Math.max(A.y, B.y) + sag} ${B.x},${B.y}`
           const lA = p.kind === 'L' && lead ? nodeWorld(session, 'jack', { x: lead.x, y: lead.y + 50 })! : A
@@ -453,56 +511,4 @@ export function Canvas({ session, onChange, selected, setSelected, highlight, fl
       </g>
     </svg>
   )
-}
-
-/** Corps d'une pièce, dessiné à plat le long de l'axe de ses pattes (a à gauche, b à droite). */
-export function PartBody({ p }: { p: Pick<Part, 'kind' | 'value' | 'color'> }) {
-  switch (p.kind) {
-    case 'R':
-      return (
-        <>
-          <rect x={-21} y={-8} width={42} height={16} rx={7} fill="#e3cf9f" stroke="#c9b07a" />
-          {resistorBands(p.value).map(([, c], i) => <rect key={i} x={-15 + i * 7 + (i === 3 ? 5 : 0)} y={-8} width={4} height={16} fill={c} />)}
-        </>
-      )
-    case 'CE':
-      return (
-        <>
-          <rect x={-18} y={-12} width={36} height={24} rx={6} fill="#1f3a93" />
-          <rect x={10} y={-12} width={8} height={24} rx={3} fill="#c7d2fe" />
-          <text x={11} y={4} fontSize={10} fontWeight={800} fill="#1f3a93">−</text>
-        </>
-      )
-    case 'CC':
-      return (
-        <>
-          <ellipse rx={13} ry={11} fill="#d9a441" stroke="#a7772a" />
-          <text y={3} fontSize={6} textAnchor="middle" fill="#3b2a0a">{p.value?.replace(/\s/g, '') ?? ''}</text>
-        </>
-      )
-    case 'LED':
-      return (
-        <>
-          <circle r={12} fill={p.color} fillOpacity={0.9} stroke="#000" strokeOpacity={0.35} />
-          <circle cx={-3} cy={-4} r={3.5} fill="#fff" fillOpacity={0.6} />
-          <line x1={8} y1={-11} x2={8} y2={11} stroke="#000" strokeOpacity={0.35} strokeWidth={2} />
-        </>
-      )
-    case 'D':
-      return (
-        <>
-          <rect x={-16} y={-6} width={32} height={12} rx={3} fill="#2b2b2b" />
-          <rect x={9} y={-6} width={4} height={12} fill="#ced4da" />
-        </>
-      )
-    case 'BTN':
-      return (
-        <>
-          <rect x={-14} y={-14} width={28} height={28} rx={3} fill="#3b3b3b" stroke="#111" />
-          <circle r={8} fill="#1a1a1a" stroke="#555" />
-        </>
-      )
-    default:
-      return null
-  }
 }

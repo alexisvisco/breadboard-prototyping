@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { EXTRA_PORT } from './boards'
 import { BB_HOLE, CARD_PINS, JACK_LEADS, holeLabel } from './geom'
 import { partName, type Session } from './model'
 
@@ -38,6 +39,14 @@ function search(session: Session, q: string): SearchHit[] {
   if (col && BB_HOLE.has(`a${col[1]}`)) {
     hits.push({ key: `a${col[1]}`, title: `Colonne ${col[1]} (a–e)`, sub: 'breadboard', port: `a${col[1]}` })
     hits.push({ key: `f${col[1]}`, title: `Colonne ${col[1]} (f–j)`, sub: 'breadboard', port: `f${col[1]}` })
+  }
+  // Planches ajoutées : trou exact (« e12 », « c4 ») ou broche par son nom.
+  const placed = new Set(Object.keys(session.nodes))
+  for (const x of EXTRA_PORT.values()) {
+    if (!placed.has(x.node) || hits.length > 40) continue
+    const title = session.extras?.find((e) => e.id === x.node)?.title ?? x.node
+    if (x.kind === 'hole' ? norm(x.name) === n : norm(x.name).includes(n))
+      hits.push({ key: x.id, title: x.kind === 'hole' ? `Trou ${x.name}` : `Broche ${x.name}`, sub: title, port: x.id })
   }
   for (const p of session.parts) {
     if (norm(`${p.label} ${p.value ?? ''}`).includes(n))

@@ -2,16 +2,41 @@
 // Rien ici n'est propre à un montage précis : l'analyse ne connaît que les règles générales.
 
 import {
-  BB_H, BB_HOLE, BB_W, RAIL_COLS, CARD_H, CARD_PIN, CARD_PINS, CARD_W, JACK_H, JACK_LEAD, JACK_LEADS, JACK_W, Nets, holeLabel, isHole,
+  BB_H, BB_W, RAIL_COLS, CARD_H, CARD_PIN, CARD_PINS, CARD_W, JACK_H, JACK_LEAD, JACK_LEADS, JACK_W, Nets, holeLabel, isHole,
   stripLabel, stripOf, type Pos,
 } from './geom'
+import { EXTRA_PORT, MCU_MODELS, cleanExtra, extraDesc, extraOf, extraSize, layoutOf, newExtra, registerExtras, type Extra } from './boards'
 
 // ------------------------------------------------------------------ types
 
-/** R résistance · CE condensateur chimique · CC céramique · LED · D diode · BTN bouton · W fil Dupont · L fil du câble jack */
-export type Kind = 'R' | 'CE' | 'CC' | 'LED' | 'D' | 'BTN' | 'W' | 'L'
-export type BlockId = 'card' | 'jack'
-export type NodeId = 'bb' | BlockId
+/**
+ * R résistance · CE condensateur chimique · CC céramique · LED · D diode · BTN bouton · W fil Dupont · L fil du câble jack
+ * SW interrupteur · LDR photorésistance · NTC thermistance · BZ buzzer · IND inductance · MOT moteur · BAT pile
+ * POT potentiomètre · NPN / PNP / NMOS transistors · REG régulateur · SERVO servomoteur · RGB LED RGB · SONAR capteur HC-SR04
+ */
+export type Kind =
+  | 'R' | 'CE' | 'CC' | 'LED' | 'D' | 'BTN' | 'W' | 'L'
+  | 'SW' | 'LDR' | 'NTC' | 'BZ' | 'IND' | 'MOT' | 'BAT' | 'POT' | 'NPN' | 'PNP' | 'NMOS' | 'REG' | 'SERVO' | 'RGB' | 'SONAR'
+/** Un bloc de la boîte : 'card', 'jack', ou l'identifiant d'une planche supplémentaire (« bread1 », « perf1 », « mcu1 »). */
+export type BlockId = string
+export type NodeId = string
+
+export const LEGS = ['a', 'b', 'c', 'd'] as const
+export type Leg = (typeof LEGS)[number]
+
+/** Nom de chaque patte, pour les pièces qui en ont plus de deux ou qui ont un sens. */
+export const LEG_NAMES: Partial<Record<Kind, string[]>> = {
+  CE: ['+', '−'], LED: ['+', '−'], D: ['anode', 'cathode'], BZ: ['+', '−'], BAT: ['+', '−'],
+  POT: ['1', 'curseur', '2'], NPN: ['B', 'C', 'E'], PNP: ['B', 'C', 'E'], NMOS: ['G', 'D', 'S'],
+  REG: ['IN', 'GND', 'OUT'], SERVO: ['GND', '+5V', 'signal'], RGB: ['R', 'K', 'G', 'B'], SONAR: ['VCC', 'Trig', 'Echo', 'GND'],
+}
+/** Noms très courts des pattes, écrits sur le canevas. */
+export const LEG_SHORT: Partial<Record<Kind, string[]>> = {
+  POT: ['1', 'C', '2'], NPN: ['B', 'C', 'E'], PNP: ['B', 'C', 'E'], NMOS: ['G', 'D', 'S'], REG: ['IN', 'G', 'OUT'],
+  SERVO: ['GND', '5V', 'SIG'], RGB: ['R', 'K', 'G', 'B'], SONAR: ['VCC', 'TRG', 'ECH', 'GND'],
+}
+export const legCount = (k: Kind) => LEG_NAMES[k]?.length ?? 2
+export const legsOf = (p: Pick<Part, 'kind'>): Leg[] => LEGS.slice(0, legCount(p.kind)) as unknown as Leg[]
 
 /**
  * Une pièce de la boîte. `a` / `b` : ports où sont plantées ses deux pattes (null = pas posée).
@@ -26,6 +51,9 @@ export interface Part {
   color: string
   a: string | null
   b: string | null
+  /** 3e et 4e pattes (potentiomètre, transistor, RGB…). */
+  c?: string | null
+  d?: string | null
 }
 
 export interface Session {
@@ -33,18 +61,27 @@ export interface Session {
   name: string
   createdAt: string
   /** Blocs posés sur le canevas (la breadboard est toujours là). */
-  nodes: { bb: Pos; card?: Pos; jack?: Pos }
+  nodes: { bb: Pos; [id: string]: Pos | undefined }
   /** Blocs présents dans la boîte (posés ou non). */
   blocks: BlockId[]
+  /** Planches ajoutées au magasin : breadboards sur mesure, plaques perforées, cartes de développement. */
+  extras?: Extra[]
   parts: Part[]
   /** « col » : trous de rail numérotés par colonne (60 → 3). Absent = ancien format (1 → 50), converti au chargement. */
   railNumbering?: 'col'
 }
 
-export const BLOCKS: Record<NodeId, { title: string; desc: string; w: number; h: number }> = {
+export const BLOCKS: Record<'bb' | 'card' | 'jack', { title: string; desc: string; w: number; h: number }> = {
   bb: { title: 'Breadboard 830 points', desc: '', w: BB_W, h: BB_H },
   card: { title: 'Carte Makerfabs ESP32-S3 4G', desc: '26 broches : IO, 3V3, GND, 5V, VBAT', w: CARD_W, h: CARD_H },
   jack: { title: 'Câble jack 4 pôles coupé', desc: '6 fils : écouteur (EAR_P, EAR_N, masse), micro (masse, mic, mic)', w: JACK_W, h: JACK_H },
+}
+
+/** Titre, description et taille d'un bloc, planches supplémentaires comprises. */
+export function blockInfo(s: Pick<Session, 'extras'>, id: NodeId): { title: string; desc: string; w: number; h: number } {
+  if (id === 'bb' || id === 'card' || id === 'jack') return BLOCKS[id]
+  const x = s.extras?.find((e) => e.id === id)
+  return { title: x?.title ?? id, desc: x ? extraDesc(x) : '', ...(extraSize(id) ?? { w: 240, h: 240 }) }
 }
 
 export function uuid(): string {
@@ -65,9 +102,11 @@ export function newSession(name: string): Session {
 
 /** Remet d'aplomb une session venue du serveur (anciens formats compris). */
 export function normalize(s: Session): Session {
+  registerExtras(s.extras)
   const nodes = { ...s.nodes } as Session['nodes']
   for (const k of Object.keys(nodes) as NodeId[]) if (nodes[k]) nodes[k] = { ...nodes[k]!, rot: nodes[k]!.rot ?? 0 }
-  const blocks = s.blocks ?? (['card', 'jack'] as BlockId[]).filter((b) => nodes[b] || s.parts.some((p) => b === 'jack' && p.kind === 'L'))
+  let blocks = s.blocks ?? (['card', 'jack'] as BlockId[]).filter((b) => nodes[b] || s.parts.some((p) => b === 'jack' && p.kind === 'L'))
+  for (const x of s.extras ?? []) if (!blocks.includes(x.id)) blocks = [...blocks, x.id]
   let parts = s.parts ?? []
   // Ancienne numérotation des rails (1 → 50) : on passe au numéro de colonne (60 → 3).
   if (s.railNumbering !== 'col') {
@@ -151,6 +190,8 @@ export interface ShopItem {
   kind: Exclude<Kind, 'L'>
   title: string
   desc: string
+  /** Rayon du magasin. */
+  cat: string
   /** Valeurs proposées ; `custom` : on peut taper sa propre valeur. */
   values?: string[]
   custom?: string
@@ -158,17 +199,45 @@ export interface ShopItem {
   color: string
 }
 
+export const SHOP_CATS = ['Passifs', 'Diodes et transistors', 'Entrées, sorties et capteurs', 'Alimentation et câblage'] as const
+
 export const SHOP: ShopItem[] = [
-  { kind: 'R', title: 'Résistance', desc: 'Freine le courant. Pas de sens.', values: ['100 Ω', '220 Ω', '330 Ω', '1 kΩ', '4,7 kΩ', '10 kΩ', '100 kΩ'], custom: 'ex. 2.2k', color: '#e3cf9f' },
-  { kind: 'CE', title: 'Condensateur chimique', desc: 'Polarisé : patte longue = +.', values: ['1 µF', '10 µF', '47 µF', '100 µF', '470 µF'], custom: 'ex. 22 µF', color: '#1f3a93' },
-  { kind: 'CC', title: 'Condensateur céramique', desc: 'Petite pastille. Pas de sens.', values: ['22 pF', '10 nF', '100 nF', '1 µF'], custom: 'ex. 47 nF', color: '#d9a441' },
-  { kind: 'LED', title: 'LED', desc: 'Patte longue = + (anode). Toujours avec une résistance.', colors: LED_COLORS, color: LED_COLORS[0].hex },
-  { kind: 'D', title: 'Diode', desc: 'Le courant passe de l’anode vers la bague.', values: ['1N4148', '1N4007'], color: '#2b2b2b' },
-  { kind: 'BTN', title: 'Bouton poussoir', desc: 'Relie ses deux pattes quand on appuie.', color: '#3b3b3b' },
-  { kind: 'W', title: 'Fil Dupont mâle-mâle', desc: 'Relie deux trous, ou un trou et une broche.', colors: WIRE_COLORS, color: WIRE_COLORS[0].hex },
+  { cat: 'Passifs', kind: 'R', title: 'Résistance', desc: 'Freine le courant. Pas de sens.', values: ['100 Ω', '220 Ω', '330 Ω', '1 kΩ', '4,7 kΩ', '10 kΩ', '100 kΩ'], custom: 'ex. 2.2k', color: '#e3cf9f' },
+  { cat: 'Passifs', kind: 'POT', title: 'Potentiomètre', desc: '3 pattes : deux extrémités et le curseur (au milieu). Résistance réglable.', values: ['1 kΩ', '10 kΩ', '50 kΩ', '100 kΩ'], custom: 'ex. 20k', color: '#2f6fb0' },
+  { cat: 'Passifs', kind: 'LDR', title: 'Photorésistance (LDR)', desc: 'Sa résistance baisse quand il y a de la lumière. Pas de sens.', values: ['GL5528'], color: '#c9a23a' },
+  { cat: 'Passifs', kind: 'NTC', title: 'Thermistance NTC', desc: 'Sa résistance baisse quand il fait chaud. Pas de sens.', values: ['10 kΩ', '100 kΩ'], custom: 'ex. 4.7k', color: '#3a7bd5' },
+  { cat: 'Passifs', kind: 'CE', title: 'Condensateur chimique', desc: 'Polarisé : patte longue = +.', values: ['1 µF', '10 µF', '47 µF', '100 µF', '470 µF', '1000 µF'], custom: 'ex. 22 µF', color: '#1f3a93' },
+  { cat: 'Passifs', kind: 'CC', title: 'Condensateur céramique', desc: 'Petite pastille. Pas de sens.', values: ['22 pF', '10 nF', '100 nF', '1 µF'], custom: 'ex. 47 nF', color: '#d9a441' },
+  { cat: 'Passifs', kind: 'IND', title: 'Inductance (bobine)', desc: 'Stocke de l’énergie dans un champ magnétique. Pas de sens.', values: ['10 µH', '100 µH', '1 mH'], custom: 'ex. 220 µH', color: '#8a5a2b' },
+
+  { cat: 'Diodes et transistors', kind: 'LED', title: 'LED', desc: 'Patte longue = + (anode). Toujours avec une résistance.', colors: LED_COLORS, color: LED_COLORS[0].hex },
+  { cat: 'Diodes et transistors', kind: 'RGB', title: 'LED RGB (cathode commune)', desc: '4 pattes côte à côte : rouge, cathode commune (la plus longue, vers GND), vert, bleu. Une résistance par couleur.', color: '#f1f3f5' },
+  { cat: 'Diodes et transistors', kind: 'D', title: 'Diode', desc: 'Le courant passe de l’anode vers la bague. Zener : bloque en dessous de sa tension, la laisse passer au-dessus.', values: ['1N4148', '1N4007', '1N5819 Schottky', 'Zener 3,3 V', 'Zener 5,1 V'], custom: 'ex. 1N4001', color: '#2b2b2b' },
+  { cat: 'Diodes et transistors', kind: 'NPN', title: 'Transistor NPN', desc: 'Interrupteur commandé : un petit courant dans B laisse passer C → E. Pattes posées B · C · E ; vérifie l’ordre réel sur la fiche.', values: ['2N2222', 'BC547', '2N3904', 'BC337'], custom: 'ex. BC548', color: '#222222' },
+  { cat: 'Diodes et transistors', kind: 'PNP', title: 'Transistor PNP', desc: 'Comme le NPN mais le courant sort de C → E vers le haut. Pattes B · C · E.', values: ['2N2907', 'BC557', '2N3906'], custom: 'ex. BC558', color: '#222222' },
+  { cat: 'Diodes et transistors', kind: 'NMOS', title: 'MOSFET canal N', desc: 'Interrupteur commandé en tension (G), pour les charges plus fortes. Pattes G · D · S.', values: ['2N7000', 'IRLZ44N', 'IRF520'], custom: 'ex. IRLB8721', color: '#222222' },
+  { cat: 'Diodes et transistors', kind: 'REG', title: 'Régulateur de tension', desc: 'Sort une tension fixe. Pattes IN · GND · OUT (7805). Autres modèles : vérifie la fiche.', values: ['7805 (5 V)', '7812 (12 V)', 'LM1117 3,3 V'], color: '#222222' },
+
+  { cat: 'Entrées, sorties et capteurs', kind: 'BTN', title: 'Bouton poussoir', desc: 'Relie ses deux pattes quand on appuie.', color: '#3b3b3b' },
+  { cat: 'Entrées, sorties et capteurs', kind: 'SW', title: 'Interrupteur', desc: 'Ouvre ou ferme le circuit et reste dans sa position.', color: '#444b52' },
+  { cat: 'Entrées, sorties et capteurs', kind: 'BZ', title: 'Buzzer', desc: 'Patte longue = +. Actif : bip dès qu’on l’alimente. Passif : il faut un signal.', values: ['actif 5 V', 'passif'], color: '#1a1a1a' },
+  { cat: 'Entrées, sorties et capteurs', kind: 'MOT', title: 'Moteur DC', desc: 'Petit moteur à courant continu. Pas de sens fixe (inverser = tourner à l’envers). Ne jamais le brancher direct sur une broche.', values: ['3–6 V'], color: '#9aa3ab' },
+  { cat: 'Entrées, sorties et capteurs', kind: 'SERVO', title: 'Servomoteur', desc: '3 fils : GND (marron), +5 V (rouge), signal (orange).', values: ['SG90'], color: '#2d74da' },
+  { cat: 'Entrées, sorties et capteurs', kind: 'SONAR', title: 'Capteur ultrasons HC-SR04', desc: '4 pattes : VCC (5 V), Trig, Echo, GND. Echo sort en 5 V : abaisse-le avant une carte 3,3 V.', color: '#1f6fb5' },
+
+  { cat: 'Alimentation et câblage', kind: 'BAT', title: 'Pile / batterie', desc: 'Patte + et patte −. Attention à ne jamais les relier ensemble.', values: ['9 V', '3 V (CR2032)', '1,5 V (AA)', '3,7 V (LiPo)'], custom: 'ex. 4,5 V', color: '#b8860b' },
+  { cat: 'Alimentation et câblage', kind: 'W', title: 'Fil Dupont mâle-mâle', desc: 'Relie deux trous, ou un trou et une broche.', colors: WIRE_COLORS, color: WIRE_COLORS[0].hex },
 ]
 
-const PREFIX: Record<Kind, string> = { R: 'R', CE: 'C', CC: 'C', LED: 'LED', D: 'D', BTN: 'BP', W: 'Fil ', L: '' }
+const PREFIX: Record<Kind, string> = {
+  R: 'R', CE: 'C', CC: 'C', LED: 'LED', D: 'D', BTN: 'BP', W: 'Fil ', L: '', SW: 'SW', LDR: 'LDR', NTC: 'NTC', BZ: 'BZ', IND: 'L', MOT: 'M', BAT: 'BAT',
+  POT: 'RV', NPN: 'Q', PNP: 'Q', NMOS: 'Q', REG: 'U', SERVO: 'SV', RGB: 'RGB', SONAR: 'US',
+}
+
+/** Valeur tapée à la main : en ohms pour les pièces à résistance. */
+export const OHM_KINDS: Kind[] = ['R', 'POT', 'NTC']
+/** Pièces dont on peut changer la valeur. */
+export const HAS_VALUE = (k: Kind) => k !== 'W' && k !== 'L' && k !== 'LED' && k !== 'RGB' && k !== 'BTN' && k !== 'SW'
 
 /** Ajoute `qty` pièces à la boîte, numérotées à la suite (R1, R2… / C1… / Fil 1…). */
 export function addToBox(s: Session, kind: Exclude<Kind, 'L'>, qty: number, value: string | undefined, color: string): Session {
@@ -188,14 +257,21 @@ export function addBlock(s: Session, b: BlockId): Session {
   return { ...s, blocks: [...s.blocks, b], parts: [...s.parts.filter((p) => !leads.some((l) => l.id === p.id)), ...leads] }
 }
 
+/** Ajoute une planche (breadboard, perfboard, stripboard, carte) à la boîte. */
+export function addExtra(s: Session, spec: Omit<Extra, 'id'>): Session {
+  const e = newExtra(s.extras ?? [], cleanExtra({ ...spec, id: '' }))
+  registerExtras([e])
+  return { ...s, extras: [...(s.extras ?? []), e], blocks: [...s.blocks, e.id] }
+}
+
 /** Retire un bloc du canevas (il reste dans la boîte) et débranche ce qui y était planté. */
 export function unplaceBlock(s: Session, b: BlockId): Session {
   const nodes = { ...s.nodes }
   delete nodes[b]
-  const onIt = (port: string | null) => !!port && (b === 'card' ? CARD_PIN.has(port) : false)
+  const onIt = (port: string | null) => !!port && (b === 'card' ? CARD_PIN.has(port) : EXTRA_PORT.get(port)?.node === b)
   const parts = s.parts.map((p) => {
-    if (b === 'jack' && p.kind === 'L') return { ...p, b: null }
-    if (p.kind !== 'W') return p
+    if (p.kind === 'L') return b === 'jack' || onIt(p.b) ? { ...p, b: null } : p
+    if (p.kind !== 'W') return legsOf(p).some((l) => onIt(p[l] ?? null)) ? { ...p, a: null, b: null, c: null, d: null } : p
     const a = onIt(p.a) ? null : p.a
     const bb = onIt(p.b) ? null : p.b
     return a ? { ...p, a, b: bb } : { ...p, a: bb, b: null }
@@ -205,12 +281,19 @@ export function unplaceBlock(s: Session, b: BlockId): Session {
 
 export function removeBlock(s: Session, b: BlockId): Session {
   const t = unplaceBlock(s, b)
-  return { ...t, blocks: t.blocks.filter((x) => x !== b), parts: b === 'jack' ? t.parts.filter((p) => p.kind !== 'L') : t.parts }
+  return {
+    ...t,
+    blocks: t.blocks.filter((x) => x !== b),
+    extras: t.extras?.filter((x) => x.id !== b),
+    parts: b === 'jack' ? t.parts.filter((p) => p.kind !== 'L') : t.parts,
+  }
 }
 
 // ------------------------------------------------------------------ noms
 
 export function portNet(port: string): string {
+  const x = EXTRA_PORT.get(port)
+  if (x) return x.net
   if (isHole(port)) return `bb:${stripOf(port)}`
   const pin = CARD_PIN.get(port)
   if (pin) return pin.net
@@ -219,8 +302,12 @@ export function portNet(port: string): string {
   return port
 }
 
+const titleOf = (id: string) => extraOf(id)?.title ?? id
+
 export function portLabel(port: string | null): string {
   if (!port) return 'non branché'
+  const x = EXTRA_PORT.get(port)
+  if (x) return x.kind === 'pin' ? `broche ${x.name} de ${titleOf(x.node)}` : holeLabel(port)
   if (isHole(port)) return holeLabel(port)
   const pin = CARD_PIN.get(port)
   if (pin) return `broche ${pin.name} de la carte`
@@ -229,9 +316,11 @@ export function portLabel(port: string | null): string {
   return port
 }
 
-/** Version courte : « e12 », « rail − haut 30 », « IO9 ». */
+/** Version courte : « e12 », « rail − haut 30 », « IO9 », « C4 · Plaque 1 ». */
 export function portShort(port: string | null): string {
   if (!port) return '—'
+  const x = EXTRA_PORT.get(port)
+  if (x) return `${x.name} · ${titleOf(x.node)}`
   const rail = /^([+-])([HB])(\d+)$/.exec(port)
   if (rail) return `rail ${rail[1] === '+' ? '+' : '−'} ${rail[2] === 'H' ? 'haut' : 'bas'} ${rail[3]}`
   if (isHole(port)) return port
@@ -245,23 +334,28 @@ export function partName(p: Part): string {
   return p.value ? `${p.label} (${p.value})` : p.label
 }
 
-export const POLAR: Kind[] = ['CE', 'LED', 'D']
+/** Pièces dont les deux pattes ont un sens (+ / −). */
+export const POLAR: Kind[] = ['CE', 'LED', 'D', 'BZ', 'BAT']
 
-export function legName(p: Part, end: 'a' | 'b'): string {
-  if (p.kind === 'CE' || p.kind === 'LED') return `${p.label} ${end === 'a' ? '+' : '−'}`
-  if (p.kind === 'D') return `${p.label} ${end === 'a' ? 'anode' : 'cathode'}`
-  return p.label
+export function legName(p: Part, end: Leg): string {
+  const n = LEG_NAMES[p.kind]
+  return n ? `${p.label} ${n[LEGS.indexOf(end)]}` : p.label
 }
 
-/** Où sont les pattes : « + e12 · − e15 », « a3 ↔ IO9 », « dans la boîte ». */
+/** Où sont les pattes : « + e12 · − e15 », « B e12 · C e11 · E e10 », « a3 ↔ IO9 », « dans la boîte ». */
 export function placeText(p: Part): string {
   if (p.kind === 'L') return p.b ? portShort(p.b) : 'débranché'
   if (!p.a && !p.b) return 'dans la boîte'
-  if (POLAR.includes(p.kind)) return `${legName(p, 'a').split(' ').pop()} ${portShort(p.a)} · ${legName(p, 'b').split(' ').pop()} ${portShort(p.b)}`
+  const names = LEG_NAMES[p.kind]
+  if (names) return legsOf(p).map((l, i) => `${names[i]} ${portShort(p[l] ?? null)}`).join(' · ')
   return `${portShort(p.a)} ↔ ${portShort(p.b)}`
 }
 
 export const isPlaced = (p: Part) => (p.kind === 'L' ? !!p.b : !!p.a)
+/** Les ports où sont plantées les pattes d'une pièce (une patte non posée = null). */
+export const legPorts = (p: Part): (string | null)[] => legsOf(p).map((l) => p[l] ?? null)
+/** Même pièce remise dans la boîte. */
+export const sameLegs = (x: Part, y: Part) => LEGS.every((l) => (x[l] ?? null) === (y[l] ?? null))
 
 // ------------------------------------------------------------------ analyse
 
@@ -284,6 +378,7 @@ export interface Analysis {
 }
 
 export function analyse(s: Session): Analysis {
+  registerExtras(s.extras)
   const nets = new Nets()
   const card = !!s.nodes.card
   const jack = !!s.nodes.jack
@@ -300,14 +395,16 @@ export function analyse(s: Session): Analysis {
     if (!groups.has(n)) groups.set(n, { names: [], places: [], parts: [] })
     return groups.get(n)!
   }
-  const ends: { part: Part; end: 'a' | 'b'; net: string }[] = []
+  const ends: { part: Part; end: Leg; net: string }[] = []
   for (const p of parts) {
-    for (const end of ['a', 'b'] as const) {
+    for (const end of legsOf(p)) {
       const port = p[end]
       if (!port || (p.kind === 'L' && end === 'a')) continue
       const n = node(port)
       if (isHole(port)) g(n).places.push(stripLabel(stripOf(port)))
       if (CARD_PIN.has(port)) g(n).names.push(`broche ${CARD_PIN.get(port)!.name}`)
+      const xp = EXTRA_PORT.get(port)
+      if (xp?.kind === 'pin') g(n).names.push(`broche ${xp.name} (${titleOf(xp.node)})`)
       g(n).parts.push(p.id)
       if (p.kind === 'L') g(n).names.push(`jack ${p.label}`)
       else if (p.kind !== 'W') {
@@ -335,15 +432,42 @@ export function analyse(s: Session): Analysis {
     }
   }
 
+  // Cartes de développement ajoutées : mêmes vérifications que la carte Makerfabs.
+  for (const x of s.extras ?? []) {
+    const lay = x.kind === 'mcu' && s.nodes[x.id] ? layoutOf(x.id) : null
+    if (!lay) continue
+    const model = MCU_MODELS[x.model ?? '']
+    const first = (role: string) => lay.ports.find((q) => q.role === role)
+    const netOf = (role: string) => {
+      const q = first(role)
+      return q ? T(q.net) : null
+    }
+    const pairs: [string, string, string][] = [
+      ['3v3', 'gnd', 'le 3V3 est relié directement à la masse'],
+      ['5v', 'gnd', 'le 5V est relié directement à la masse'],
+      ['5v', '3v3', 'le 5V est relié au 3V3'],
+    ]
+    for (const [r1, r2, t] of pairs) {
+      const n1 = netOf(r1)
+      if (n1 && n1 === netOf(r2)) add('ko', `COURT-CIRCUIT sur ${x.title} : ${t}. Débranche la carte !`)
+    }
+    for (const q of lay.ports) {
+      if (q.role !== 'io') continue
+      const n = T(q.net)
+      if (n === netOf('gnd') || n === netOf('3v3')) add('warn', `La broche ${q.name} de ${x.title} est reliée par un simple fil au ${n === netOf('gnd') ? 'GND' : '3V3'} : elle sera bloquée à cette tension.`)
+      else if (model?.logic === 3.3 && n === netOf('5v')) add('ko', `La broche ${q.name} de ${x.title} reçoit du 5V : plus de 3,3 V peut la détruire.`)
+    }
+  }
+
   for (const p of parts) {
-    if (p.kind === 'W' || p.kind === 'L' || !p.a || !p.b) continue
+    if (p.kind === 'W' || p.kind === 'L' || legCount(p.kind) > 2 || !p.a || !p.b) continue
     if (node(p.a) === node(p.b)) add('ko', `${partName(p)} : ses deux pattes sont dans le même groupe de trous (même colonne ou même rail). Le courant la contourne, elle ne sert à rien.`, [p.id])
   }
 
   const seen = new Map<string, Part>()
   for (const p of parts)
-    for (const e of [p.a, p.b])
-      if (e && isHole(e) && !(p.kind === 'L' && e === p.a)) {
+    for (const e of p.kind === 'L' ? [p.b] : legPorts(p))
+      if (e && isHole(e)) {
         const other = seen.get(e)
         if (other) add('ko', `Deux pattes dans le même trou ${portShort(e)} (${other.label} et ${p.label}) : un trou ne prend qu'une patte.`, [other.id, p.id])
         seen.set(e, p)
@@ -356,7 +480,7 @@ export function analyse(s: Session): Analysis {
   for (const e of ends) {
     const grp = groups.get(e.net)!
     if (grp.names.length === 1 && !grp.parts.some((id) => id !== e.part.id))
-      add('warn', `${POLAR.includes(e.part.kind) ? `La patte ${legName(e.part, e.end)}` : `Une patte de ${e.part.label}`} (${portShort(e.part[e.end])}) n'est reliée à rien d'autre.`, [e.part.id])
+      add('warn', `${LEG_NAMES[e.part.kind] ? `La patte ${legName(e.part, e.end)}` : `Une patte de ${e.part.label}`} (${portShort(e.part[e.end] ?? null)}) n'est reliée à rien d'autre.`, [e.part.id])
   }
 
   if (!checks.some((c) => c.state === 'ko')) add('ok', card ? 'Aucun court-circuit d’alimentation.' : 'Pas d’erreur évidente. Pose la carte pour vérifier l’alimentation.')
@@ -370,15 +494,16 @@ export function analyse(s: Session): Analysis {
 // ------------------------------------------------------------------ résumé texte (pour Claude)
 
 export function summary(s: Session, a: Analysis): string {
-  const where = (e: string | null) => (e ? `${portShort(e)}${BB_HOLE.has(e) ? ` [${stripLabel(stripOf(e))}]` : ''}` : 'non branché')
+  registerExtras(s.extras)
+  const where = (e: string | null) => (e ? `${portShort(e)}${isHole(e) ? ` [${stripLabel(stripOf(e))}]` : ''}` : 'non branché')
   const lines = [`# Session « ${s.name} »`, `id ${s.id}`, '']
   lines.push('## Blocs')
   lines.push('- Breadboard 830 points : colonnes 62 (gauche) → 1 (droite), rails + − en haut et en bas (50 trous, sous les colonnes 60 → 3)')
-  for (const b of s.blocks) lines.push(`- ${BLOCKS[b].title} : ${s.nodes[b] ? `posé (rotation ${s.nodes[b]!.rot}°)` : 'dans la boîte, pas posé'}`)
+  for (const b of s.blocks) lines.push(`- ${blockInfo(s, b).title}${s.extras?.some((x) => x.id === b) ? ` (id « ${b} », ports « ${b}:… », ${blockInfo(s, b).desc})` : ''} : ${s.nodes[b] ? `posé (rotation ${s.nodes[b]!.rot}°)` : 'dans la boîte, pas posé'}`)
   lines.push('', '## Pièces posées')
   for (const p of s.parts.filter(isPlaced)) {
     if (p.kind === 'L') lines.push(`- Fil jack ${p.label} (${colorName(p.color)}) : ${where(p.b)}`)
-    else if (POLAR.includes(p.kind)) lines.push(`- ${partName(p)} : ${legName(p, 'a')} ${where(p.a)} | ${legName(p, 'b')} ${where(p.b)}`)
+    else if (LEG_NAMES[p.kind]) lines.push(`- ${partName(p)} : ${legsOf(p).map((l) => `${legName(p, l)} ${where(p[l] ?? null)}`).join(' | ')}`)
     else lines.push(`- ${partName(p)} : ${where(p.a)} ↔ ${where(p.b)}`)
   }
   const box = s.parts.filter((p) => !isPlaced(p) && p.kind !== 'L')
@@ -411,13 +536,16 @@ function links(a: Analysis): Set<string> {
 }
 
 export function diffSessions(from: Session, to: Session): Diff {
+  registerExtras(from.extras)
+  registerExtras(to.extras)
   const lines: DiffLine[] = []
-  for (const b of to.blocks) if (!from.blocks.includes(b)) lines.push({ type: 'add', text: `${BLOCKS[b].title} ajouté à la boîte` })
-  for (const b of from.blocks) if (!to.blocks.includes(b)) lines.push({ type: 'del', text: `${BLOCKS[b].title} retiré de la boîte` })
-  for (const b of ['card', 'jack'] as BlockId[]) {
-    if (!from.nodes[b] && to.nodes[b]) lines.push({ type: 'add', text: `${BLOCKS[b].title} posé sur le canevas` })
-    if (from.nodes[b] && !to.nodes[b] && to.blocks.includes(b)) lines.push({ type: 'del', text: `${BLOCKS[b].title} retiré du canevas` })
+  for (const b of to.blocks) if (!from.blocks.includes(b)) lines.push({ type: 'add', text: `${blockInfo(to, b).title} ajouté à la boîte` })
+  for (const b of from.blocks) if (!to.blocks.includes(b)) lines.push({ type: 'del', text: `${blockInfo(from, b).title} retiré de la boîte` })
+  for (const b of to.blocks.filter((x) => x !== 'bb')) {
+    if (!from.nodes[b] && to.nodes[b]) lines.push({ type: 'add', text: `${blockInfo(to, b).title} posé sur le canevas` })
   }
+  for (const b of from.blocks.filter((x) => x !== 'bb'))
+    if (from.nodes[b] && !to.nodes[b] && to.blocks.includes(b)) lines.push({ type: 'del', text: `${blockInfo(to, b).title} retiré du canevas` })
   const before = new Map(from.parts.map((p) => [p.id, p]))
   const after = new Map(to.parts.map((p) => [p.id, p]))
   for (const p of to.parts) {
@@ -427,7 +555,7 @@ export function diffSessions(from: Session, to: Session): Diff {
       continue
     }
     const ch: string[] = []
-    if (o.a !== p.a || o.b !== p.b) {
+    if (!sameLegs(o, p)) {
       if (!isPlaced(o)) ch.push(`posé : ${placeText(p)}`)
       else if (!isPlaced(p)) ch.push(p.kind === 'L' ? 'débranché' : 'remis dans la boîte')
       else ch.push(`${placeText(o)} → ${placeText(p)}`)
@@ -458,6 +586,8 @@ export interface Ghost {
 
 /** Couleur de chaque pièce actuelle qui a changé depuis `old`, et fantômes des anciennes places. */
 export function diffMarks(old: Session, cur: Session): { marks: Record<string, string>; ghosts: Ghost[] } {
+  registerExtras(old.extras)
+  registerExtras(cur.extras)
   const marks: Record<string, string> = {}
   const ghosts: Ghost[] = []
   const before = new Map(old.parts.map((p) => [p.id, p]))
@@ -466,7 +596,7 @@ export function diffMarks(old: Session, cur: Session): { marks: Record<string, s
     if (!isPlaced(p)) continue
     const o = before.get(p.id)
     if (!o || !isPlaced(o)) marks[p.id] = DIFF_COLORS.add
-    else if (o.a !== p.a || o.b !== p.b) {
+    else if (!sameLegs(o, p)) {
       marks[p.id] = DIFF_COLORS.mod
       ghosts.push({ part: o, label: `${p.label} avant`, tone: DIFF_COLORS.mod })
     } else if (o.value !== p.value || o.color !== p.color || o.label !== p.label) marks[p.id] = DIFF_COLORS.mod

@@ -5,6 +5,7 @@ import {
   BB_H, BB_HOLES, BB_W, CARD_H, CARD_JACK, CARD_PINS, CARD_W, COLS, JACK_H, JACK_LEADS, JACK_PLUG, JACK_W,
   LETTERS, RAIL_HOLES, RAIL_ROWS, bbColX, bbRailX, bbRowY,
 } from './geom'
+import { LETTERS as XLETTERS, MCU_MODELS, breadGeom, colLetters, layoutOf, mcuGeom, perfGeom, pinLocal, type Extra } from './boards'
 
 /** Vrai si le bloc est pivoté de 180° ou 270° : ses textes se retournent pour rester lisibles. */
 const Flip = createContext(false)
@@ -181,6 +182,134 @@ export function JackNode({ colors }: { colors: Record<string, string> }) {
           <circle cx={l.x} cy={l.y} r={4} fill={colors[l.id] ?? l.color} />
         </g>
       ))}
+    </g>
+  )
+}
+
+// ------------------------------------------------------------------ planches supplémentaires
+
+export function ExtraNode({ extra, hover, flash }: Hl & { extra: Extra }) {
+  if (extra.kind === 'bread') return <BreadNode extra={extra} hover={hover} flash={flash} />
+  if (extra.kind === 'mcu') return <McuNode extra={extra} hover={hover} flash={flash} />
+  return <PerfNode extra={extra} hover={hover} flash={flash} />
+}
+
+function BreadNode({ extra, hover, flash }: Hl & { extra: Extra }) {
+  const g = breadGeom(extra)
+  const lay = layoutOf(extra.id)
+  if (!lay) return null
+  const rows = g.rails ? (['+H', '-H', '+B', '-B'] as const) : []
+  const n = 5 * g.g
+  return (
+    <g>
+      <NodeTitle w={lay.w} title={extra.title} sub={`${g.cols} colonnes`} />
+      <rect data-drag="node" width={lay.w} height={lay.h} rx={14} fill="#f3f1ea" stroke="#cfc9b8" strokeWidth={2} />
+      {rows.map((r) => {
+        const plus = r.startsWith('+')
+        const y = g.y(r) + (plus ? -12 : 12)
+        return (
+          <g key={r}>
+            <line x1={g.railX(0) - 10} x2={g.railX(n - 1) + 10} y1={y} y2={y} stroke={plus ? '#d7192f' : '#1d4ed8'} strokeWidth={2} />
+            <Text x={18} y={g.y(r) + 5} fontSize={15} fontWeight={700} fill={plus ? '#d7192f' : '#1d4ed8'} fontFamily={SANS}>{plus ? '+' : '−'}</Text>
+            <Text x={lay.w - 18} y={g.y(r) + 5} fontSize={15} fontWeight={700} fill={plus ? '#d7192f' : '#1d4ed8'} fontFamily={SANS} textAnchor="end">{plus ? '+' : '−'}</Text>
+          </g>
+        )
+      })}
+      <rect x={g.colX(1) - 10} y={(g.y('e') + g.y('f')) / 2 - 7} width={g.colX(g.cols) - g.colX(1) + 20} height={14} rx={4} fill="#e2ddcf" />
+      {XLETTERS.map((l) => (
+        <g key={l} fontSize={12} fill="#8a8574" fontFamily={MONO}>
+          <Text x={24} y={g.y(l) + 4} textAnchor="middle" fontSize={12}>{l}</Text>
+          <Text x={lay.w - 24} y={g.y(l) + 4} textAnchor="middle" fontSize={12}>{l}</Text>
+        </g>
+      ))}
+      {Array.from({ length: g.cols }, (_, i) => i + 1)
+        .filter((c) => c === 1 || c === g.cols || c % 5 === 0)
+        .map((c) => (
+          <g key={c} fontSize={11} fill="#8a8574" fontFamily={MONO}>
+            <Text x={g.colX(c)} y={g.y('a') - 13} textAnchor="middle">{c}</Text>
+            <Text x={g.colX(c)} y={g.y('j') + 21} textAnchor="middle">{c}</Text>
+          </g>
+        ))}
+      {lay.ports.map((h) => (
+        <rect key={h.id} x={h.x - 4.5} y={h.y - 4.5} width={9} height={9} rx={1.5} fill={holeFill(h.id, { hover, flash })} />
+      ))}
+    </g>
+  )
+}
+
+function PerfNode({ extra, hover, flash }: Hl & { extra: Extra }) {
+  const g = perfGeom(extra)
+  const lay = layoutOf(extra.id)
+  if (!lay) return null
+  const strip = extra.kind === 'strip'
+  return (
+    <g>
+      <NodeTitle w={lay.w} title={extra.title} sub={`${g.cols} × ${g.rows}`} />
+      <rect data-drag="node" width={lay.w} height={lay.h} rx={10} fill={strip ? '#b98b4d' : '#3f7a4a'} stroke={strip ? '#8a6330' : '#2a5434'} strokeWidth={2} />
+      {strip &&
+        Array.from({ length: g.rows }, (_, i) => i + 1).map((r) => (
+          <rect key={r} x={10} y={g.rowY(r) - 8} width={lay.w - 20} height={16} rx={8} fill="#d9aa5e" opacity={0.85} />
+        ))}
+      {Array.from({ length: g.cols }, (_, i) => i + 1)
+        .filter((c) => g.cols <= 26 || c === 1 || c % 5 === 0)
+        .map((c) => (
+          <Text key={c} x={g.colX(c)} y={g.rowY(1) - 18} textAnchor="middle" fontSize={11} fill="#ffffffcc" fontFamily={MONO}>{colLetters(c)}</Text>
+        ))}
+      {Array.from({ length: g.rows }, (_, i) => i + 1)
+        .filter((r) => g.rows <= 20 || r === 1 || r % 5 === 0)
+        .map((r) => (
+          <Text key={r} x={14} y={g.rowY(r) + 4} textAnchor="start" fontSize={11} fill="#ffffffcc" fontFamily={MONO}>{r}</Text>
+        ))}
+      {lay.ports.map((h) => {
+        const on = flash === h.id ? '#ffd43b' : hover === h.id ? '#e8590c' : null
+        return (
+          <g key={h.id}>
+            {!strip && <circle cx={h.x} cy={h.y} r={8.5} fill={on ?? '#d9b44a'} />}
+            <circle cx={h.x} cy={h.y} r={strip ? 4.5 : 3.6} fill={on ?? '#1a1a1a'} />
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+function McuNode({ extra, hover, flash }: Hl & { extra: Extra }) {
+  const m = MCU_MODELS[extra.model ?? '']
+  const lay = layoutOf(extra.id)
+  if (!m || !lay) return null
+  const gm = mcuGeom(m)
+  const gold = '#d9b44a'
+  const modW = Math.min(m.w - 100, 130)
+  const modX = (m.w - modW) / 2
+  const side = (names: string[], right: boolean) =>
+    names.map((name) => {
+      const p = lay.ports.find((q) => q.id === `${extra.id}:${pinLocal(name)}`)!
+      return (
+        <g key={p.id}>
+          {flash === p.id && <circle cx={p.x} cy={p.y} r={13} fill="#ffd43b" />}
+          <circle cx={p.x} cy={p.y} r={7} fill={hover === p.id ? '#e8590c' : gold} />
+          <circle cx={p.x} cy={p.y} r={3} fill="#222" />
+          <Text x={right ? p.x - 14 : p.x + 14} y={p.y + 4} fontSize={10.5} fontWeight={p.role === 'io' ? 400 : 700} fill={p.role === 'gnd' ? '#9aa3a0' : p.role === '5v' ? '#ff9b8f' : p.role === '3v3' ? '#ffd27a' : '#f1f3f5'} fontFamily={MONO} textAnchor={right ? 'end' : 'start'}>
+            {name.replace(/-\d+$/, '')}
+          </Text>
+        </g>
+      )
+    })
+  return (
+    <g>
+      <NodeTitle w={m.w} title={extra.title} sub="vue de dessus" />
+      <rect data-drag="node" width={m.w} height={gm.h} rx={12} fill={m.color} stroke="#000" strokeOpacity={0.4} strokeWidth={2} />
+      <g fill="#0d0f12" stroke="#cfd4d9" strokeWidth={2}>
+        <circle cx={10} cy={10} r={4} /><circle cx={m.w - 10} cy={10} r={4} /><circle cx={10} cy={gm.h - 10} r={4} /><circle cx={m.w - 10} cy={gm.h - 10} r={4} />
+      </g>
+      {/* module radio + antenne */}
+      <rect x={modX} y={14} width={modW} height={64} rx={3} fill="#c9ccd1" stroke="#8d939a" />
+      <Text x={m.w / 2} y={50} fontSize={9} fill="#4b5158" textAnchor="middle" fontFamily={MONO} fontWeight={700}>{m.module}</Text>
+      {/* USB */}
+      <rect x={m.w / 2 - (m.usb === 'usb-c' ? 22 : 18)} y={gm.h - 6} width={m.usb === 'usb-c' ? 44 : 36} height={12} rx={m.usb === 'usb-c' ? 6 : 2} fill="#bfc3c8" stroke="#7d828a" />
+      <Text x={m.w / 2} y={gm.h - 16} fontSize={9} fill="#ffffffaa" textAnchor="middle" fontFamily={MONO}>USB</Text>
+      {side(m.left, false)}
+      {side(m.right, true)}
     </g>
   )
 }

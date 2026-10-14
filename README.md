@@ -3,7 +3,10 @@
 Recopier un montage électronique dans le navigateur, pour apprendre et diagnostiquer.
 
 - **Session** = un identifiant aléatoire dans l'URL (`/s/<uuid>`). Pas de compte : qui a le lien peut lire et modifier.
-- **Magasin** → **boîte** de la session → **canevas** : on ajoute à sa boîte ce qu'on a chez soi (résistances, condensateurs, LED, diodes, boutons, fils Dupont, carte Makerfabs ESP32-S3 4G, câble jack), puis on glisse chaque pièce sur la breadboard.
+- **Magasin** → **boîte** de la session → **canevas** : on ajoute à sa boîte ce qu'on a chez soi, puis on glisse chaque pièce sur une planche. Trois rayons :
+  - **Composants** : résistances, potentiomètre, photorésistance, thermistance, condensateurs, bobine, LED (et LED RGB), diodes (Zener, Schottky), transistors NPN / PNP, MOSFET, régulateur 7805, bouton, interrupteur, buzzer, moteur, servo, HC-SR04, piles, fils Dupont. Les pièces à 3 ou 4 pattes se posent côte à côte et leurs pattes sont nommées sur le canevas (B · C · E, IN · GND · OUT…).
+  - **Planches** : breadboards sur mesure (nombre de colonnes, rails + − en option ; presets 170 / 400 / 830 points) et plaques perforées sur mesure (perfboard à pastilles isolées, ou stripboard à bandes). On peut en ajouter autant qu'on veut.
+  - **Cartes** : Makerfabs ESP32-S3 4G, câble jack, et des cartes de développement : ESP32 DevKit V1, ESP32-S3-DevKitC-1, ESP32-C3 SuperMini, ESP32-CAM, ESP8266 NodeMCU, Wemos D1 Mini, Raspberry Pi Pico, Arduino Nano. Leurs broches se relient avec des fils ; l'analyse repère 3V3 / 5V / GND court-circuités et une broche 3,3 V qui reçoit du 5 V.
 - **Analyse** : courts-circuits d'alimentation, pièce dont les deux pattes sont reliées, deux pattes dans un trou, fil branché d'un seul côté, patte reliée à rien ; liste de ce qui est relié ensemble.
 - **Diff** : choisis une version, tout ce qui a changé depuis s'affiche d'un coup sur le canevas (vert ajouté, orange déplacé / modifié, rouge retiré) ; la version d'avant reste visible en transparence à son ancienne place.
 - **Versions** : instantanés nommés, comparaison (pièces ajoutées / déplacées / retirées et liaisons électriques gagnées / perdues), restauration.
@@ -11,7 +14,7 @@ Recopier un montage électronique dans le navigateur, pour apprendre et diagnost
 
 ## Travailler avec Claude
 
-- **Copier pour Claude** (en haut) : copie un mode d'emploi complet (format JSON, comment ajouter une pièce « depuis le magasin », comment la placer, broches de la carte, calques) suivi du résumé et du JSON du montage. À coller dans n'importe quelle conversation.
+- **Copier pour Claude** (en haut) : copie un mode d'emploi complet (format JSON, comment ajouter une pièce « depuis le magasin », comment la placer, planches et cartes ajoutées avec leurs broches, calques) suivi du résumé et du JSON du montage. À coller dans n'importe quelle conversation.
 - **Importer un JSON** : on colle la réponse de Claude (`{"name", "session", "layers"}`, avec ou sans bloc \`\`\`json). L'app vérifie (trous et broches existants, pattes cohérentes), montre le diff, puis crée une version — appliquée ou non.
 - Avec accès réseau, Claude peut aussi passer par l'API (`POST …/versions`, `PUT …/layers/:id`).
 

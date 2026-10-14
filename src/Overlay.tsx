@@ -1,7 +1,7 @@
 // Rendu des calques visibles, par-dessus tout le reste du canevas (ne capte pas la souris).
 // Les repères gardent une taille lisible quel que soit le zoom.
 
-import { railShift, type Pt } from './geom'
+import { bandEnds, type Pt } from './geom'
 import { annColor, portName, resolvePart, resolvePort, type Layer } from './layers'
 import type { Session } from './model'
 
@@ -27,27 +27,17 @@ export function Pill({ x, y, text, color, size = 13 }: { x: number; y: number; t
 
 /** Bande colorée sur ce qui est relié au trou visé : sa colonne (5 trous) ou quelques trous de rail ; ligne discrète sur sa rangée. */
 function Band({ port, color, at, k }: { port: string; color: string; at: (p: string) => Pt | null; k: number }) {
-  const rail = /^([+-][HB])(\d+)$/.exec(port)
-  let ends: [string, string]
-  let row: [string, string] | null = null
-  if (rail) {
-    ends = [railShift(port, -2), railShift(port, 2)]
-  } else {
-    const m = /^([a-j])(\d+)$/.exec(port)
-    if (!m) return null
-    const top = 'abcde'.includes(m[1])
-    ends = [`${top ? 'a' : 'f'}${m[2]}`, `${top ? 'e' : 'j'}${m[2]}`]
-    row = [`${m[1]}62`, `${m[1]}1`]
-  }
-  const a = at(ends[0])
-  const b = at(ends[1])
-  if (!a || !b) return null
-  const ra = row ? at(row[0]) : null
-  const rb = row ? at(row[1]) : null
+  const b = bandEnds(port)
+  if (!b) return null
+  const a = at(b.ends[0])
+  const c = at(b.ends[1])
+  if (!a || !c) return null
+  const ra = b.row ? at(b.row[0]) : null
+  const rb = b.row ? at(b.row[1]) : null
   return (
     <g>
       {ra && rb && <line x1={ra.x} y1={ra.y} x2={rb.x} y2={rb.y} stroke={color} strokeWidth={14} strokeOpacity={0.1} strokeLinecap="round" />}
-      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={Math.max(22, 14 * k)} strokeOpacity={0.28} strokeLinecap="round" />
+      <line x1={a.x} y1={a.y} x2={c.x} y2={c.y} stroke={color} strokeWidth={Math.max(22, 14 * k)} strokeOpacity={0.28} strokeLinecap="round" />
     </g>
   )
 }
