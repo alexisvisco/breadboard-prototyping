@@ -1,5 +1,6 @@
 // « Importer un JSON » : coller la réponse de Claude → vérification, diff, création d'une version.
 
+import { DiffSign, LinkSign } from './icons'
 import { useMemo, useState } from 'react'
 import { parseImport } from './agent'
 import { createVersion } from './api'
@@ -41,7 +42,6 @@ export function ImportDialog({ session, onClose, onApply, onDone }: Props) {
   }
 
   const color = { add: 'text-emerald-300', del: 'text-red-300', mod: 'text-yellow-200' }
-  const sign = { add: '＋', del: '−', mod: '~' }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/55 py-[6vh]" onPointerDown={onClose}>
@@ -63,7 +63,7 @@ export function ImportDialog({ session, onClose, onApply, onDone }: Props) {
           />
           {res && (
             <div className="space-y-3 text-sm">
-              {res.errors.map((e, i) => <p key={i} className="rounded bg-red-500/15 px-3 py-1.5 text-red-200">✗ {e}</p>)}
+              {res.errors.map((e, i) => <p key={i} className="rounded bg-red-500/15 px-3 py-1.5 text-red-200">{e}</p>)}
               {res.warnings.map((e, i) => <p key={i} className="rounded bg-yellow-400/10 px-3 py-1.5 text-yellow-100">! {e}</p>)}
               {diff && !res.errors.length && (
                 <div className="rounded-lg border border-white/10 p-3">
@@ -71,13 +71,13 @@ export function ImportDialog({ session, onClose, onApply, onDone }: Props) {
                   {!diff.lines.length && !diff.linksAdded.length && !diff.linksRemoved.length && <p className="text-white/50">Aucune différence avec l'état actuel.</p>}
                   <ul className="grid gap-0.5">
                     {diff.lines.map((l, i) => (
-                      <li key={i} className="flex gap-2"><span className={`font-bold ${color[l.type]}`}>{sign[l.type]}</span>{l.text}</li>
+                      <li key={i} className="flex gap-2"><span className={`font-bold ${color[l.type]}`}><DiffSign type={l.type} /></span>{l.text}</li>
                     ))}
                   </ul>
                   {(diff.linksAdded.length > 0 || diff.linksRemoved.length > 0) && (
                     <ul className="mt-2 grid gap-0.5 font-mono text-xs">
-                      {diff.linksAdded.map((l) => <li key={`+${l}`} className="text-emerald-300">＋ {l}</li>)}
-                      {diff.linksRemoved.map((l) => <li key={`-${l}`} className="text-red-300">− {l}</li>)}
+                      {diff.linksAdded.map((l) => <li key={`+${l}`} className="text-emerald-300"><LinkSign add /> {l}</li>)}
+                      {diff.linksRemoved.map((l) => <li key={`-${l}`} className="text-red-300"><LinkSign add={false} /> {l}</li>)}
                     </ul>
                   )}
                 </div>

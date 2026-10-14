@@ -1,5 +1,6 @@
 // Versions d'une session : instantanés nommés, comparaison (diff) et restauration.
 
+import { DiffSign, LinkSign } from './icons'
 import { useEffect, useMemo, useState } from 'react'
 import { ask, confirmAsk } from './dialog'
 import { createVersion, deleteVersion, fetchVersion, listVersions, type VersionMeta } from './api'
@@ -67,7 +68,6 @@ export function Versions({ session, onRestore, onHighlight }: Props) {
   }
 
   const color = { add: 'text-emerald-300', del: 'text-red-300', mod: 'text-yellow-200' }
-  const sign = { add: '＋', del: '−', mod: '~' }
 
   return (
     <div className="space-y-4">
@@ -128,7 +128,7 @@ export function Versions({ session, onRestore, onHighlight }: Props) {
                       onPointerLeave={() => onHighlight([])}
                       className="flex gap-2 rounded px-2 py-1 hover:bg-white/5"
                     >
-                      <span className={`shrink-0 font-bold ${color[l.type]}`}>{sign[l.type]}</span>
+                      <span className={`shrink-0 font-bold ${color[l.type]}`}><DiffSign type={l.type} /></span>
                       <span className="leading-snug">{l.text}</span>
                     </li>
                   ))}
@@ -138,8 +138,8 @@ export function Versions({ session, onRestore, onHighlight }: Props) {
                 <div>
                   <h4 className="mb-1 text-xs font-semibold text-white/55">Liaisons électriques</h4>
                   <ul className="grid gap-0.5 font-mono text-xs">
-                    {diff.linksAdded.map((l) => <li key={`+${l}`} className="text-emerald-300">＋ {l}</li>)}
-                    {diff.linksRemoved.map((l) => <li key={`-${l}`} className="text-red-300">− {l}</li>)}
+                    {diff.linksAdded.map((l) => <li key={`+${l}`} className="text-emerald-300"><LinkSign add /> {l}</li>)}
+                    {diff.linksRemoved.map((l) => <li key={`-${l}`} className="text-red-300"><LinkSign add={false} /> {l}</li>)}
                   </ul>
                 </div>
               )}

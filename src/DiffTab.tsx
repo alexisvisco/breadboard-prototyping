@@ -1,5 +1,6 @@
 // Onglet « Diff » : ce qui a changé depuis une version, affiché d'un coup sur le canevas.
 
+import { DiffSign, LinkSign } from './icons'
 import { useEffect, useMemo, useState } from 'react'
 import { fetchVersion, listVersions, type VersionMeta } from './api'
 import { DIFF_COLORS, diffSessions, normalize, type Session } from './model'
@@ -43,7 +44,6 @@ export function DiffTab({ session, onBase, onHighlight }: Props) {
 
   const diff = useMemo(() => (base ? diffSessions(base, session) : null), [base, session])
   const color = { add: 'text-emerald-300', del: 'text-red-300', mod: 'text-orange-300' }
-  const sign = { add: '＋', del: '−', mod: '~' }
 
   if (list && !list.length)
     return <p className="text-sm leading-relaxed text-white/50">Pas encore de version. Crée-en une dans l'onglet « Versions » : ensuite, tout ce que tu changes apparaît ici, en couleur sur le canevas.</p>
@@ -74,7 +74,7 @@ export function DiffTab({ session, onBase, onHighlight }: Props) {
               onPointerLeave={() => onHighlight([])}
               className="flex gap-2 rounded px-2 py-1 hover:bg-white/5"
             >
-              <span className={`shrink-0 font-bold ${color[l.type]}`}>{sign[l.type]}</span>
+              <span className={`shrink-0 font-bold ${color[l.type]}`}><DiffSign type={l.type} /></span>
               <span className="leading-snug">{l.text}</span>
             </li>
           ))}
@@ -84,8 +84,8 @@ export function DiffTab({ session, onBase, onHighlight }: Props) {
         <div>
           <h4 className="mb-1 text-xs font-semibold text-white/55">Liaisons électriques</h4>
           <ul className="grid gap-0.5 font-mono text-xs">
-            {diff.linksAdded.map((l) => <li key={`+${l}`} className="text-emerald-300">＋ {l}</li>)}
-            {diff.linksRemoved.map((l) => <li key={`-${l}`} className="text-red-300">− {l}</li>)}
+            {diff.linksAdded.map((l) => <li key={`+${l}`} className="text-emerald-300"><LinkSign add /> {l}</li>)}
+            {diff.linksRemoved.map((l) => <li key={`-${l}`} className="text-red-300"><LinkSign add={false} /> {l}</li>)}
           </ul>
         </div>
       )}

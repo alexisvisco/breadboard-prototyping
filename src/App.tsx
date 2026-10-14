@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle2, CircuitBoard, CornerDownRight, Maximize, Minus, MoreHorizontal, PanelRightClose, PanelRightOpen, Plus, RotateCw, Spline, X, XCircle, Check } from 'lucide-react'
 import { fetchSession, forgetSession, recentSessions, rememberSession, saveSession } from './api'
 import { agentBrief } from './agent'
 import { Box } from './Box'
 import { DialogHost, ask, confirmAsk, tell } from './dialog'
-import { Canvas, nodeCenter, portWorld, type CanvasApi } from './Canvas'
+import { Canvas, addAnchor, nodeCenter, portWorld, type CanvasApi } from './Canvas'
 import { ContextMenu, rotateNode, unplacePart } from './ContextMenu'
 import { registerExtras } from './boards'
 import {
@@ -69,7 +70,7 @@ function Home({ go }: { go: (p: string) => void }) {
     <div className="min-h-full bg-[#101614] px-4 py-14 text-[#e6ece8]">
       <div className="mx-auto max-w-xl">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-500/20 text-xl text-emerald-300">⌁</div>
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-500/20 text-emerald-300"><CircuitBoard className="size-6" /></div>
           <h1 className="text-2xl font-semibold">Breadboard</h1>
         </div>
         <p className="mt-3 leading-relaxed text-white/60">
@@ -122,7 +123,7 @@ function Home({ go }: { go: (p: string) => void }) {
                     onClick={() => { forgetSession(r.id); setRecent(recentSessions()) }}
                     className="invisible px-3 text-white/40 hover:text-red-300 group-hover:visible"
                   >
-                    ×
+                    <X className="size-4" />
                   </button>
                 </li>
               ))}
@@ -405,7 +406,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
     <div className="flex h-full flex-col bg-[#101614] font-sans text-[#e6ece8]">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-[#141c19] px-3">
         <button onClick={() => go('/')} className="flex items-center gap-2 pr-1" title="Accueil">
-          <div className="grid h-7 w-7 place-items-center rounded-md bg-emerald-500/20 text-emerald-300">⌁</div>
+          <div className="grid h-7 w-7 place-items-center rounded-md bg-emerald-500/20 text-emerald-300"><CircuitBoard className="size-4" /></div>
         </button>
         <button onClick={rename} title="Renommer" className="max-w-[260px] truncate rounded-md px-2 py-1 text-sm font-semibold hover:bg-white/10">
           {session.name}
@@ -422,20 +423,20 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
             {save === 'saved' ? 'Enregistré' : save === 'pending' ? 'Enregistrement…' : 'Non enregistré : serveur injoignable'}
           </span>
           <button onClick={() => copy('link', location.href)} className="rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10">
-            {copied === 'link' ? 'Copié ✓' : 'Copier le lien'}
+            {copied === 'link' ? <span className="inline-flex items-center gap-1"><Check className="size-4" /> Copié</span> : 'Copier le lien'}
           </button>
           <button
             onClick={() => copy('claude', agentBrief(session, location.origin))}
             title={`Mode d'emploi + JSON du montage, à coller dans une conversation avec Claude. Résumé texte : ${summaryUrl}`}
             className="rounded-md border border-white/10 px-3 py-1.5 hover:bg-white/10"
           >
-            {copied === 'claude' ? 'Copié ✓' : 'Copier pour Claude'}
+            {copied === 'claude' ? <span className="inline-flex items-center gap-1"><Check className="size-4" /> Copié</span> : 'Copier pour Claude'}
           </button>
           <button onClick={() => setImportOpen(true)} className="rounded-md bg-emerald-500/90 px-3 py-1.5 font-semibold text-[#0d1512] hover:bg-emerald-400">
             Importer un JSON
           </button>
-          <button onClick={toggleRight} title={rightOpen ? 'Masquer le panneau de droite' : 'Afficher le panneau de droite'} className={`rounded-md border border-white/10 px-2.5 py-1.5 hover:bg-white/10 ${rightOpen ? '' : 'text-emerald-300'}`}>
-            {rightOpen ? '⇥' : '⇤'} Panneau
+          <button onClick={toggleRight} title={rightOpen ? 'Masquer le panneau de droite' : 'Afficher le panneau de droite'} className={`inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 hover:bg-white/10 ${rightOpen ? '' : 'text-emerald-300'}`}>
+            {rightOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />} Panneau
           </button>
         </div>
       </header>
@@ -471,9 +472,9 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
           )}
 
           <div className="absolute bottom-4 left-4 flex overflow-hidden rounded-lg border border-white/10 bg-[#18211d]/95 text-sm shadow-lg">
-            <button className="px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.zoom(1 / 1.25)} title="Dézoomer">−</button>
-            <button className="border-x border-white/10 px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.fit()}>Tout voir</button>
-            <button className="px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.zoom(1.25)} title="Zoomer">＋</button>
+            <button className="px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.zoom(1 / 1.25)} title="Dézoomer"><Minus className="size-4" /></button>
+            <button className="inline-flex items-center gap-1.5 border-x border-white/10 px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.fit()}><Maximize className="size-4" /> Tout voir</button>
+            <button className="px-3 py-1.5 hover:bg-white/10" onClick={() => canvas.current?.zoom(1.25)} title="Zoomer"><Plus className="size-4" /></button>
           </div>
           <div className="pointer-events-none absolute bottom-4 left-1/2 max-w-[60%] -translate-x-1/2 truncate rounded-full bg-black/60 px-4 py-1.5 font-mono text-xs text-white/80">
             {hoverText ?? 'Glisser le fond ou clic molette : se déplacer · molette : zoomer · clic droit : options'}
@@ -484,19 +485,29 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
               <span className="font-semibold">{sel ? partName(sel) : blockInfo(session, selNode!).title}</span>
               {sel && <span className="text-white/65">{placeText(sel)}</span>}
               {selNode && (
-                <button className="rounded bg-white/10 px-2.5 py-1 hover:bg-white/20" onClick={() => update((s) => rotateNode(s, selNode, 90))}>
-                  ↻ Pivoter <kbd className="text-white/40">R</kbd>
+                <button className="inline-flex items-center gap-1.5 rounded bg-white/10 px-2.5 py-1 hover:bg-white/20" onClick={() => update((s) => rotateNode(s, selNode, 90))}>
+                  <RotateCw className="size-4" /> Pivoter <kbd className="text-white/40">R</kbd>
                 </button>
               )}
+              {sel?.kind === 'W' && sel.b && (
+                <>
+                  <button title="Ancrage courbe : le fil passe par ce point en douceur" className="inline-flex items-center gap-1.5 rounded bg-white/10 px-2.5 py-1 hover:bg-white/20" onClick={() => update((s) => addAnchor(s, sel.id, 'curve'))}>
+                    <Spline className="size-4" /> Ancrage courbe
+                  </button>
+                  <button title="Ancrage d’angle : le fil fait un angle vif, pour les angles droits" className="inline-flex items-center gap-1.5 rounded bg-white/10 px-2.5 py-1 hover:bg-white/20" onClick={() => update((s) => addAnchor(s, sel.id, 'corner'))}>
+                    <CornerDownRight className="size-4" /> Ancrage d’angle
+                  </button>
+                </>
+              )}
               <button
-                className="rounded bg-white/10 px-2.5 py-1 hover:bg-white/20"
+                className="inline-flex items-center gap-1.5 rounded bg-white/10 px-2.5 py-1 hover:bg-white/20"
                 onClick={(e) => {
                   const r = (e.target as HTMLElement).getBoundingClientRect()
                   e.stopPropagation()
                   setMenu({ target: selected!, x: r.left, y: r.bottom + 6 })
                 }}
               >
-                Options…
+                <MoreHorizontal className="size-4" /> Options
               </button>
             </div>
           )}
@@ -526,7 +537,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
                       className={`flex gap-2 rounded-md px-3 py-2 ${c.state === 'ok' ? 'bg-emerald-500/10' : c.state === 'ko' ? 'bg-red-500/15' : 'bg-yellow-400/10'}`}
                     >
                       <span className={`shrink-0 font-bold ${c.state === 'ok' ? 'text-emerald-300' : c.state === 'ko' ? 'text-red-300' : 'text-yellow-200'}`}>
-                        {c.state === 'ok' ? '✓' : c.state === 'ko' ? '✗' : '!'}
+                        {c.state === 'ok' ? <CheckCircle2 className="size-4" /> : c.state === 'ko' ? <XCircle className="size-4" /> : <AlertTriangle className="size-4" />}
                       </span>
                       <span className="leading-snug">{c.text}</span>
                     </li>

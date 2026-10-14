@@ -56,10 +56,8 @@ export interface Part {
   d?: string | null
   /** Fil Dupont : courbure en pixels (écart du milieu du fil par rapport à la ligne droite, + = côté droit en allant de a vers b). Absent = pendant naturel. */
   bend?: number
-  /** Fil Dupont : coudes. Chaque point est donné en pixels par rapport au bout « a » (dx → droite, dy → bas) ; le fil passe par eux dans l'ordre, a → … → b. */
-  via?: { dx: number; dy: number }[]
-  /** Rayon des coins quand il y a des coudes, en pixels (0 = angles vifs ; absent = 6). */
-  round?: number
+  /** Fil Dupont : ancrages. Chaque point est en pixels par rapport au bout « a » (dx → droite, dy → bas) ; le fil passe par eux dans l'ordre. kind : « curve » = courbe douce, « corner » (défaut) = angle vif. */
+  via?: { dx: number; dy: number; kind?: 'curve' | 'corner' }[]
 }
 
 export interface Session {
@@ -568,7 +566,7 @@ export function diffSessions(from: Session, to: Session): Diff {
     }
     if (o.value !== p.value) ch.push(`valeur ${o.value ?? '—'} → ${p.value ?? '—'}`)
     if (o.bend !== p.bend) ch.push(`courbure ${o.bend ?? 'auto'} → ${p.bend ?? 'auto'}`)
-    if (JSON.stringify(o.via) !== JSON.stringify(p.via) || o.round !== p.round) ch.push('tracé du fil modifié')
+    if (JSON.stringify(o.via) !== JSON.stringify(p.via)) ch.push('ancrages du fil modifiés')
     if (o.color !== p.color) ch.push(`couleur ${colorName(o.color)} → ${colorName(p.color)}`)
     if (o.label !== p.label) ch.push(`renommé ${o.label} → ${p.label}`)
     if (ch.length) lines.push({ type: 'mod', text: `${partName(p)} : ${ch.join(' · ')}`, partId: p.id })

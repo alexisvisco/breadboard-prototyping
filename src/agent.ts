@@ -52,11 +52,12 @@ Mets dans "a" et "b" les trous où vont ses deux pattes, ex. "a": "e25", "b": "e
 - Les deux pattes d'une pièce doivent être dans deux groupes de trous différents, sinon elle est court-circuitée.
 - Pièces à 3 ou 4 pattes (POT, NPN, PNP, NMOS, REG, SERVO, RGB, SONAR) : "a", "b", "c" (et "d") dans l'ordre des noms ci-dessus ; les pattes se posent côte à côte (ex. "a": "e25", "b": "e24", "c": "e23"), dans trois colonnes différentes. Toutes posées, ou aucune.
 - W (fil Dupont) : "a" et "b" = un trou ou une broche de la carte. "b": null = bout libre.
-  Courbure facultative d'un fil : "bend" (nombre de pixels, ex. 80 ou -120). Le milieu du fil s'écarte de cette distance de la ligne droite a→b ;
-  positif = côté droit en allant de "a" vers "b" (à l'écran, a à gauche et b à droite : positif = vers le bas). Un trou = 24 px. 0 = fil tendu.
-  Coudes (angles droits, tracés en escalier) : "via": [ {"dx": 120, "dy": 0}, {"dx": 120, "dy": 200} ] = le fil part de "a", passe par ces points dans l'ordre, puis arrive à "b".
-  Chaque point est en pixels PAR RAPPORT AU BOUT "a" (dx vers la droite, dy vers le bas ; un trou = 24 px). Pour un seul coude à 90° : horizontal puis vertical = [{"dx": xb-xa, "dy": 0}], vertical puis horizontal = [{"dx": 0, "dy": yb-ya}].
-  "round" = rayon des coins en px (0 = angles vifs, 6 par défaut). Avec "via", "bend" est ignoré. L'utilisateur peut aussi ajouter / déplacer les coudes à la main.
+  Ancrages (facultatif) : "via": [ {"dx": 120, "dy": 0, "kind": "corner"}, {"dx": 200, "dy": 100, "kind": "curve"} ] = le fil part de "a", passe par ces points dans l'ordre, puis arrive à "b".
+  Chaque point est en pixels PAR RAPPORT AU BOUT "a" (dx vers la droite, dy vers le bas ; un trou = 24 px).
+  "kind": "corner" (par défaut) = ancrage d'angle, le fil y fait un angle vif (angles droits en escalier : alterne horizontal / vertical) ;
+  "curve" = ancrage courbe, le fil le traverse en douceur (pour arrondir un trajet). Les deux types se mélangent.
+  Un seul angle à 90° : horizontal puis vertical = [{"dx": xb-xa, "dy": 0}], vertical puis horizontal = [{"dx": 0, "dy": yb-ya}].
+  L'utilisateur peut aussi les ajouter / déplacer / changer de type à la main. Ancien réglage : "bend" (px, + = côté droit de a vers b), ignoré s'il y a des ancrages.
   Sans "bend", le fil pend naturellement sous ses deux bouts. Sers-toi de "bend" pour que les fils ne se croisent pas et ne cachent pas les trous ; l'utilisateur peut aussi les courber à la main.
 - Remettre une pièce dans la boîte : "a": null, "b": null.
 
@@ -202,9 +203,8 @@ export function parseImport(text: string, current: Session): ImportResult {
       value: p.value === undefined || p.value === null ? undefined : String(p.value),
       color: String(p.color ?? (kind === 'L' ? JACK_LEAD.get(id)!.color : (shop?.color ?? '#888888'))),
       ...(kind === 'W' && Array.isArray(p.via) && p.via.length
-        ? { via: (p.via as { dx?: unknown; dy?: unknown }[]).slice(0, 12).map((v) => ({ dx: Math.max(-4000, Math.min(4000, Math.round(Number(v?.dx) || 0))), dy: Math.max(-4000, Math.min(4000, Math.round(Number(v?.dy) || 0))) })) }
+        ? { via: (p.via as { dx?: unknown; dy?: unknown; kind?: unknown }[]).slice(0, 12).map((v) => ({ dx: Math.max(-4000, Math.min(4000, Math.round(Number(v?.dx) || 0))), dy: Math.max(-4000, Math.min(4000, Math.round(Number(v?.dy) || 0))), kind: v?.kind === 'curve' ? ('curve' as const) : ('corner' as const) })) }
         : {}),
-      ...(kind === 'W' && Number.isFinite(Number(p.round)) && p.round !== null && p.round !== '' ? { round: Math.max(0, Math.min(60, Math.round(Number(p.round)))) } : {}),
       ...(kind === 'W' && Number.isFinite(Number(p.bend)) && p.bend !== null && p.bend !== '' ? { bend: Math.max(-800, Math.min(800, Math.round(Number(p.bend)))) } : {}),
       a: at.a ?? (kind === 'W' ? (at.b ?? null) : null),
       b: kind === 'W' && !at.a ? null : (at.b ?? null),

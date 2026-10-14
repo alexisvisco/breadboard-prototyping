@@ -1,4 +1,5 @@
 import { createContext, useContext, type SVGProps } from 'react'
+import { RotateCw } from 'lucide-react'
 // Dessins des trois blocs du canevas. Coordonnées locales au bloc.
 
 import {
@@ -41,8 +42,7 @@ export function NodeTitle({ w, title, sub }: { w: number; title: string; sub?: s
       <g data-action="rotate" transform={`translate(${w - 18},-20)`} style={{ cursor: 'pointer' }}>
         <title>Pivoter de 90°</title>
         <circle r={11} fill="#2c3833" stroke="#4a5a53" />
-        <path d="M-5,-1 A5.5,5.5 0 1,1 -1,5" fill="none" stroke="#e6ece8" strokeWidth={1.8} strokeLinecap="round" />
-        <path d="M-8,-3 L-5,1 L-1.5,-2.5" fill="none" stroke="#e6ece8" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+        <RotateCw x={-7} y={-7} size={14} color="#e6ece8" strokeWidth={2.2} />
       </g>
     </g>
   )

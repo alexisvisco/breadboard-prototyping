@@ -1,6 +1,7 @@
 // Panneau de gauche : la boîte de la session (ce qu'on a acheté au magasin), à glisser sur le canevas.
 
 import { useState } from 'react'
+import { ShoppingCart, X } from 'lucide-react'
 import { MultiBody, PartBody } from './PartArt'
 import { blockInfo, isPlaced, legCount, partName, placeText, type BlockId, type Kind, type Part, type Session } from './model'
 import type { Extra } from './boards'
@@ -109,7 +110,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, on
     <div className="flex h-full select-none flex-col">
       <div className="space-y-2 p-3">
         <button onClick={onShop} className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500/90 px-3 py-2 text-sm font-semibold text-[#0d1512] hover:bg-emerald-400">
-          <span>🛒</span> Magasin
+          <ShoppingCart className="size-4" /> Magasin
         </button>
         {!empty && (
           <input
@@ -213,7 +214,7 @@ function Remove({ onClick }: { onClick: () => void }) {
       }}
       className="invisible rounded px-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-300 group-hover:visible"
     >
-      ×
+      <X className="size-3.5" />
     </button>
   )
 }

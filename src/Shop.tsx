@@ -2,6 +2,7 @@
 // Trois rayons : composants, planches (breadboards et plaques perforées sur mesure), cartes (ESP et autres).
 
 import { useState } from 'react'
+import { Minus, Plus, Search } from 'lucide-react'
 import { BREAD_PRESETS, MCU_MODELS, PCB_COLORS, type Extra } from './boards'
 import { BlockIcon, ExtraIcon, PartIcon } from './Box'
 import { BLOCKS, OHM_KINDS, SHOP, SHOP_CATS, formatOhms, parseOhms, resistorBands, type BlockId, type ShopItem } from './model'
@@ -46,7 +47,7 @@ export function Shop({ open, owned, onClose, onAdd, onAddBlock, onAddExtra }: Pr
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
           <div>
             <h2 className="text-base font-semibold">Magasin</h2>
-            <p className="text-xs text-white/50">Ajoute à ta boîte ce que tu as vraiment sous la main. Tout est gratuit 😄</p>
+            <p className="text-xs text-white/50">Ajoute à ta boîte ce que tu as vraiment sous la main. Tout est gratuit.</p>
           </div>
           <button onClick={onClose} className="rounded-md px-3 py-1.5 text-sm hover:bg-white/10">Fermer · Échap</button>
         </div>
@@ -58,13 +59,16 @@ export function Shop({ open, owned, onClose, onAdd, onAddBlock, onAddExtra }: Pr
               </button>
             ))}
           </div>
-          <input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Rechercher : transistor, 10k, ESP32, perfboard…"
-            className="mb-1.5 ml-auto w-72 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-sm outline-none placeholder:text-white/35 focus:border-emerald-400/60"
-          />
+          <div className="relative mb-1.5 ml-auto">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-white/40" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Rechercher : transistor, 10k, ESP32, perfboard…"
+              className="w-72 rounded-md border border-white/15 bg-white/5 py-1.5 pl-8 pr-3 text-sm outline-none placeholder:text-white/35 focus:border-emerald-400/60"
+            />
+          </div>
         </div>
 
         {none && <p className="p-5 text-sm text-white/50">Rien ne correspond à « {q} ».</p>}
@@ -297,9 +301,9 @@ function ShopCard({ item, onAdd }: { item: ShopItem; onAdd: Props['onAdd'] }) {
       )}
       <div className="mt-auto flex items-center gap-2">
         <div className="flex items-center rounded-md border border-white/15">
-          <button className="px-2 py-1 hover:bg-white/10" onClick={() => setQty((q) => Math.max(1, q - 1))}>−</button>
+          <button className="px-2 py-1 hover:bg-white/10" onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus className="size-3.5" /></button>
           <span className="w-7 text-center text-sm tabular-nums">{qty}</span>
-          <button className="px-2 py-1 hover:bg-white/10" onClick={() => setQty((q) => Math.min(50, q + 1))}>＋</button>
+          <button className="px-2 py-1 hover:bg-white/10" onClick={() => setQty((q) => Math.min(50, q + 1))}><Plus className="size-3.5" /></button>
         </div>
         <button
           disabled={invalid}

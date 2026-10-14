@@ -1,9 +1,10 @@
 // Menu du clic droit : couleur des fils, valeur, sens, rotation des blocs, ranger / supprimer.
 
 import { useEffect, useRef } from 'react'
+import { Archive, ArrowLeftRight, Copy, CornerDownRight, Pencil, RotateCcw, RotateCw, ShoppingCart, Spline, Trash2, Undo2, Unplug, Eraser, SlidersHorizontal } from 'lucide-react'
 import { ask, tell } from './dialog'
 import { PCB_COLORS } from './boards'
-import { portWorld } from './Canvas'
+import { addAnchor } from './Canvas'
 import {
   addExtra, addToBox, HAS_VALUE, LED_COLORS, OHM_KINDS, POLAR, WIRE_COLORS, blockInfo, formatOhms, legCount, parseOhms, partName, removeBlock, unplaceBlock,
   type NodeId, type Part, type Session,
@@ -40,19 +41,12 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
   }, [onClose])
 
   const setPart = (id: string, patch: Partial<Part>) => update((s) => ({ ...s, parts: s.parts.map((p) => (p.id === id ? { ...p, ...patch } : p)) }))
-  // Un seul coude à angle droit entre les deux bouts du fil.
-  const elbow = (p: Part, order: 'hv' | 'vh') => {
-    const A = p.a ? portWorld(session, p.a) : null
-    const B = p.b ? portWorld(session, p.b) : null
-    if (!A || !B) return
-    const via = order === 'hv' ? [{ dx: Math.round(B.x - A.x), dy: 0 }] : [{ dx: 0, dy: Math.round(B.y - A.y) }]
-    setPart(p.id, { via, bend: undefined })
-  }
   const act = (fn: () => void) => () => {
     fn()
     onClose()
   }
-  const item = 'block w-full rounded px-2.5 py-1.5 text-left text-sm hover:bg-white/10'
+  const item = 'flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-sm hover:bg-white/10'
+  const ic = 'size-4 shrink-0 text-white/55'
   const style = { left: Math.min(x, window.innerWidth - 250), top: Math.min(y, window.innerHeight - 320) }
 
   let body: React.ReactNode = null
@@ -60,10 +54,27 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
     body = (
       <>
         <div className="px-2.5 py-1 text-xs font-semibold text-white/50">Nouveau</div>
-        <button className={item} onClick={act(onShop)}>🛒 Ouvrir le magasin…</button>
-        <button className={item} onClick={act(() => update((s) => addToBox(s, 'W', 1, undefined, WIRE_COLORS[0].hex)))}>+ Un fil Dupont dans la boîte</button>
-        <button className={item} onClick={act(() => update((s) => addToBox(s, 'R', 1, '220 Ω', '#e3cf9f')))}>+ Une résistance 220 Ω dans la boîte</button>
-        <button className={item} onClick={act(() => update((s) => addToBox(s, 'LED', 1, undefined, LED_COLORS[0].hex)))}>+ Une LED dans la boîte</button>
+        <button className={item} onClick={act(onShop)}><ShoppingCart className={ic} /> Ouvrir le magasin…</button>
+        <button className={item} onClick={act(() => update((s) => addToBox(s, 'W', 1, undefined, WIRE_COLORS[0].hex)))}><Copy className={ic} /> Un fil Dupont dans la boîte</button>
+        <button className={item} onClick={act(() => update((s) => addToBox(s, 'R', 1, '220 Ω', '#e3cf9f')))}><Copy className={ic} /> Une résistance 220 Ω dans la boîte</button>
+        <button className={item} onClick={act(() => update((s) => addToBox(s, 'LED', 1, undefined, LED_COLORS[0].hex)))}><Copy className={ic} /> Une LED dans la boîte</button>
+      </>
+    )
+  } else if (target.startsWith('anchor:')) {
+    const [pid, i] = target.slice(7).split('|')
+    const p = session.parts.find((q) => q.id === pid)
+    const idx = Number(i)
+    const cur = p?.via?.[idx]
+    if (!p || !cur) return null
+    const setKind = (kind: 'curve' | 'corner') => setPart(pid, { via: p.via!.map((v, k) => (k === idx ? { ...v, kind } : v)) })
+    const here = (kind: string) => ((cur.kind ?? 'corner') === kind ? 'bg-white/10' : '')
+    body = (
+      <>
+        <div className="px-2.5 py-1 text-xs font-semibold text-white/50">Ancrage de {p.label}</div>
+        <button className={`${item} ${here('curve')}`} onClick={act(() => setKind('curve'))}><Spline className={ic} /> Ancrage courbe</button>
+        <button className={`${item} ${here('corner')}`} onClick={act(() => setKind('corner'))}><CornerDownRight className={ic} /> Ancrage d’angle</button>
+        <div className="my-1 border-t border-white/10" />
+        <button className={`${item} text-red-300`} onClick={act(() => { const rest = p.via!.filter((_, k) => k !== idx); setPart(pid, { via: rest.length ? rest : undefined }) })}><Trash2 className="size-4 shrink-0" /> Supprimer l’ancrage</button>
       </>
     )
   } else if (target.startsWith('node:')) {
@@ -85,14 +96,14 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
             ))}
           </div>
         )}
-        {extra && <button className={item} onClick={act(() => update((s) => addExtra(s, extra)))}>+ Ajouter 1 pareille à la boîte</button>}
-        <button className={item} onClick={act(() => update((s) => rotateNode(s, id, 90)))}>↻ Pivoter de 90° <kbd className="float-right text-white/35">R</kbd></button>
-        <button className={item} onClick={act(() => update((s) => rotateNode(s, id, -90)))}>↺ Pivoter dans l'autre sens</button>
+        {extra && <button className={item} onClick={act(() => update((s) => addExtra(s, extra)))}><Copy className={ic} /> Ajouter 1 pareille à la boîte</button>}
+        <button className={item} onClick={act(() => update((s) => rotateNode(s, id, 90)))}><RotateCw className={ic} /> Pivoter de 90° <kbd className="ml-auto text-white/35">R</kbd></button>
+        <button className={item} onClick={act(() => update((s) => rotateNode(s, id, -90)))}><RotateCcw className={ic} /> Pivoter dans l'autre sens</button>
         {id !== 'bb' && (
           <>
             <div className="my-1 border-t border-white/10" />
-            <button className={item} onClick={act(() => update((s) => unplaceBlock(s, id)))}>Ranger dans la boîte</button>
-            <button className={`${item} text-red-300`} onClick={act(() => update((s) => removeBlock(s, id)))}>Supprimer de la boîte</button>
+            <button className={item} onClick={act(() => update((s) => unplaceBlock(s, id)))}><Archive className={ic} /> Ranger dans la boîte</button>
+            <button className={`${item} text-red-300`} onClick={act(() => update((s) => removeBlock(s, id)))}><Trash2 className="size-4 shrink-0" /> Supprimer de la boîte</button>
           </>
         )}
       </>
@@ -130,37 +141,31 @@ export function ContextMenu({ session, target, x, y, update, onClose, onShop }: 
             ))}
           </div>
         )}
-        {HAS_VALUE(p.kind) && <button className={item} onClick={act(editValue)}>Changer la valeur…</button>}
+        {HAS_VALUE(p.kind) && <button className={item} onClick={act(editValue)}><SlidersHorizontal className={ic} /> Changer la valeur…</button>}
         {p.kind !== 'L' && (
-          <button className={item} onClick={act(async () => { const n = await ask(`Renommer ${p.label}`, p.label); if (n) setPart(p.id, { label: n }) })}>Renommer…</button>
+          <button className={item} onClick={act(async () => { const n = await ask(`Renommer ${p.label}`, p.label); if (n) setPart(p.id, { label: n }) })}><Pencil className={ic} /> Renommer…</button>
         )}
         {POLAR.includes(p.kind) && p.a && (
-          <button className={item} onClick={act(() => setPart(p.id, { a: p.b, b: p.a }))}>Inverser le sens (+ / −)</button>
+          <button className={item} onClick={act(() => setPart(p.id, { a: p.b, b: p.a }))}><ArrowLeftRight className={ic} /> Inverser le sens (+ / −)</button>
         )}
         {p.kind === 'W' && p.b && (
           <>
-            <button className={item} onClick={act(() => setPart(p.id, { bend: Math.round((p.bend ?? 0) + 60) }))}>Courber le fil ↷ <span className="float-right text-white/35">+60</span></button>
-            <button className={item} onClick={act(() => setPart(p.id, { bend: Math.round((p.bend ?? 0) - 60) }))}>Courber le fil ↶ <span className="float-right text-white/35">−60</span></button>
-            <button className={item} onClick={act(() => elbow(p, 'hv'))}>Coude à 90° (horizontal puis vertical)</button>
-            <button className={item} onClick={act(() => elbow(p, 'vh'))}>Coude à 90° (vertical puis horizontal)</button>
-            {p.via?.length ? (
-              <>
-                <button className={item} onClick={act(() => setPart(p.id, { round: p.round === 0 ? undefined : 0 }))}>{p.round === 0 ? 'Arrondir les coins' : 'Coins vifs'}</button>
-                <button className={item} onClick={act(() => setPart(p.id, { via: undefined, round: undefined }))}>Retirer les coudes</button>
-              </>
-            ) : null}
-            {p.bend !== undefined && <button className={item} onClick={act(() => setPart(p.id, { bend: undefined }))}>Remettre le pendant naturel</button>}
+            <button className={item} onClick={act(() => update((x) => addAnchor(x, p.id, 'curve')))}><Spline className={ic} /> Ajouter un ancrage courbe</button>
+            <button className={item} onClick={act(() => update((x) => addAnchor(x, p.id, 'corner')))}><CornerDownRight className={ic} /> Ajouter un ancrage d’angle</button>
+            {(p.via?.length || p.bend !== undefined) && (
+              <button className={item} onClick={act(() => setPart(p.id, { via: undefined, bend: undefined }))}><Eraser className={ic} /> Retirer les ancrages</button>
+            )}
           </>
         )}
         {legCount(p.kind) > 2 && p.a && (
-          <button className={item} onClick={act(() => setPart(p.id, legCount(p.kind) === 3 ? { a: p.c ?? null, c: p.a } : { a: p.d ?? null, d: p.a, b: p.c ?? null, c: p.b }))}>Retourner (première ↔ dernière patte)</button>
+          <button className={item} onClick={act(() => setPart(p.id, legCount(p.kind) === 3 ? { a: p.c ?? null, c: p.a } : { a: p.d ?? null, d: p.a, b: p.c ?? null, c: p.b }))}><ArrowLeftRight className={ic} /> Retourner (première ↔ dernière patte)</button>
         )}
         <div className="my-1 border-t border-white/10" />
         {(p.kind === 'L' ? p.b : p.a) && (
-          <button className={item} onClick={act(() => setPart(p.id, unplacePart(p)))}>{p.kind === 'L' ? 'Débrancher' : 'Remettre dans la boîte'} <kbd className="float-right text-white/35">⌫</kbd></button>
+          <button className={item} onClick={act(() => setPart(p.id, unplacePart(p)))}>{p.kind === 'L' ? <Unplug className={ic} /> : <Undo2 className={ic} />} {p.kind === 'L' ? 'Débrancher' : 'Remettre dans la boîte'} <kbd className="ml-auto text-white/35">⌫</kbd></button>
         )}
         {p.kind !== 'L' && (
-          <button className={`${item} text-red-300`} onClick={act(() => update((s) => ({ ...s, parts: s.parts.filter((q) => q.id !== p.id) })))}>Supprimer de la boîte</button>
+          <button className={`${item} text-red-300`} onClick={act(() => update((s) => ({ ...s, parts: s.parts.filter((q) => q.id !== p.id) })))}><Trash2 className="size-4 shrink-0" /> Supprimer de la boîte</button>
         )}
       </>
     )

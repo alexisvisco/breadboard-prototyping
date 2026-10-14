@@ -1,6 +1,7 @@
 // Panneau flottant des calques d'annotation (en haut à droite du canevas).
 // Un calque peut être « en focus » : le reste du montage est grisé et la vue zoome sur la mesure.
 
+import { Check, Eye, X } from 'lucide-react'
 import { useState } from 'react'
 import { annColor, portName, stepPort, stepText, type Layer } from './layers'
 
@@ -43,9 +44,9 @@ export function LayersPanel({ layers, focusId, onToggle, onDelete, onFocus, onLo
                     className={`rounded px-1.5 py-0.5 text-xs ${focused ? 'bg-yellow-300 text-[#0d1512]' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
                     title="Griser le reste et zoomer sur la mesure"
                   >
-                    {focused ? 'Focus ✓' : 'Focus'}
+                    {focused ? <><Check className="inline size-3" /> Focus</> : 'Focus'}
                   </button>
-                  <button title="Supprimer le calque" onClick={() => onDelete(l)} className="invisible px-1 text-white/40 hover:text-red-300 group-hover:visible">×</button>
+                  <button title="Supprimer le calque" onClick={() => onDelete(l)} className="invisible px-1 text-white/40 hover:text-red-300 group-hover:visible"><X className="size-3.5" /></button>
                 </div>
 
                 {l.visible && steps.length > 0 && (
@@ -58,7 +59,7 @@ export function LayersPanel({ layers, focusId, onToggle, onDelete, onFocus, onLo
                           <span className="flex-1 leading-snug">{stepText(st)}</span>
                           {port && (
                             <button onClick={() => onLocate(port)} className="shrink-0 rounded bg-white/10 px-1.5 text-xs hover:bg-white/20" title={`Montrer ${portName(port)}`}>
-                              👁 {portName(port)}
+                              <Eye className="mr-1 inline size-3" />{portName(port)}
                             </button>
                           )}
                         </li>

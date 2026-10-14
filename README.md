@@ -10,8 +10,7 @@ Recopier un montage électronique dans le navigateur, pour apprendre et diagnost
 - **Analyse** : courts-circuits d'alimentation, pièce dont les deux pattes sont reliées, deux pattes dans un trou, fil branché d'un seul côté, patte reliée à rien ; liste de ce qui est relié ensemble.
 - **Diff** : choisis une version, tout ce qui a changé depuis s'affiche d'un coup sur le canevas (vert ajouté, orange déplacé / modifié, rouge retiré) ; la version d'avant reste visible en transparence à son ancienne place.
 - **Versions** : instantanés nommés, comparaison (pièces ajoutées / déplacées / retirées et liaisons électriques gagnées / perdues), restauration.
-- **Fils courbes** : sélectionne un fil, glisse le losange jaune au milieu pour le courber (double-clic : retour au pendant naturel) ; clic droit → « Courber le fil ». Dans le JSON, `"bend"` (px, + = côté droit de a vers b) : Claude peut s'en servir pour éviter que les fils se croisent.
-- **Coudes** : sélectionne un fil, glisse un « + » (milieu d'un segment) pour créer un coude, glisse un losange jaune pour le déplacer (il s'aligne tout seul sur les points voisins : angles droits faciles), double-clic dessus pour le retirer. Clic droit → « Coude à 90° ». Dans le JSON : `"via": [{"dx", "dy"}]` (px depuis le bout `a`) et `"round"` (rayon des coins).
+- **Ancrages sur les fils** : sélectionne un fil puis « Ancrage courbe » (rond jaune : le fil le traverse en douceur) ou « Ancrage d'angle » (carré orange : angle vif, pour les angles droits). Glisse un « + » au milieu d'un tronçon pour en créer un, glisse un ancrage pour le déplacer (les angles s'alignent tout seuls), double-clic pour le retirer, clic droit pour changer son type. Dans le JSON : `"via": [{"dx", "dy", "kind": "curve" | "corner"}]` (px depuis le bout `a`).
 - Clic droit sur une pièce ou un bloc : couleur des fils, valeur, sens, rotation (aussi touche `R`), ranger, supprimer.
 
 ## Travailler avec Claude
