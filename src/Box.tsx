@@ -93,10 +93,11 @@ interface Props {
   onLocate: (target: string) => void
   onRemovePart: (p: Part) => void
   onRemoveBlock: (b: BlockId) => void
+  onContext: (target: string, x: number, y: number) => void
   selected: string | null
 }
 
-export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, selected }: Props) {
+export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, onContext, selected }: Props) {
   const [q, setQ] = useState('')
   const match = (t: string) => !q || norm(t).includes(norm(q))
   const empty = !session.blocks.length && !session.parts.length
@@ -119,7 +120,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
           />
         )}
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 pb-4">
+      <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 pb-4" onContextMenu={(e) => { if (!e.defaultPrevented) { e.preventDefault(); onContext('void', e.clientX, e.clientY) } }}>
         {empty && (
           <div className="rounded-lg border border-dashed border-white/15 p-4 text-sm leading-relaxed text-white/55">
             Ta boîte est vide. Ouvre le <b className="text-white/80">magasin</b> et ajoute ce que tu as sous la main : résistances, condensateurs, fils, la carte…
@@ -141,6 +142,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
                     draggable={!on}
                     onDragStart={(e) => e.dataTransfer.setData('text/plain', `block:${b}`)}
                     onClick={() => on && onLocate(`node:${b}`)}
+                    onContextMenu={(e) => { e.preventDefault(); onContext(`node:${b}`, e.clientX, e.clientY) }}
                     className={`${row} ${on ? used : free} ${selected === `node:${b}` ? 'ring-1 ring-yellow-300/60' : ''}`}
                   >
                     <BlockIcon id={b} extra={session.extras?.find((x) => x.id === b)} />
@@ -177,6 +179,7 @@ export function Box({ session, onShop, onLocate, onRemovePart, onRemoveBlock, se
                       draggable={draggable}
                       onDragStart={(e) => e.dataTransfer.setData('text/plain', `part:${p.id}`)}
                       onClick={() => (on || p.kind === 'L') && onLocate(p.id)}
+                      onContextMenu={(e) => { e.preventDefault(); onContext(p.id, e.clientX, e.clientY) }}
                       className={`${row} ${draggable ? free : used} ${selected === p.id ? 'ring-1 ring-yellow-300/60' : ''}`}
                     >
                       <PartIcon kind={p.kind} value={p.value} color={p.color} />

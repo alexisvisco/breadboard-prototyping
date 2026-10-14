@@ -442,7 +442,7 @@ function Editor({ session, setSession, save, go }: { session: Session; setSessio
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-72 shrink-0 overflow-hidden border-r border-white/10 bg-[#141c19]">
-          <Box session={session} selected={selected} onShop={() => setShopOpen(true)} onLocate={locate} onRemovePart={removePart} onRemoveBlock={removeBlk} />
+          <Box session={session} selected={selected} onShop={() => setShopOpen(true)} onLocate={locate} onRemovePart={removePart} onRemoveBlock={removeBlk} onContext={(target, x, y) => { setSelected(target); setMenu({ target, x, y }) }} />
         </aside>
 
         <main className="relative min-w-0 flex-1">
